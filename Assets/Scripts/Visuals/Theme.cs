@@ -1,19 +1,21 @@
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
-    /// <summary>Colour set for one level. The game cycles through these as you level up.</summary>
+    /// <summary>Natural matte colour set for one level. The game cycles through these as you level up.</summary>
     public struct Theme
     {
-        public Color bg, board, frame, head, tail;
+        public Color bg, board, frame, block, head, tail, accent;
 
-        public Theme(string bg, string board, string frame, string head, string tail)
+        public Theme(string bg, string board, string frame, string block, string head, string tail, string accent)
         {
             this.bg = Palette.Hex(bg);
             this.board = Palette.Hex(board);
             this.frame = Palette.Hex(frame);
+            this.block = Palette.Hex(block);
             this.head = Palette.Hex(head);
             this.tail = Palette.Hex(tail);
+            this.accent = Palette.Hex(accent);
         }
 
         public static Theme Lerp(Theme a, Theme b, float t) => new Theme
@@ -21,41 +23,31 @@ namespace NeonSnake
             bg = Color.Lerp(a.bg, b.bg, t),
             board = Color.Lerp(a.board, b.board, t),
             frame = Color.Lerp(a.frame, b.frame, t),
+            block = Color.Lerp(a.block, b.block, t),
             head = Color.Lerp(a.head, b.head, t),
             tail = Color.Lerp(a.tail, b.tail, t),
+            accent = Color.Lerp(a.accent, b.accent, t),
         };
 
         public static readonly Theme[] All =
         {
-            new Theme("#060A16", "#101932", "#3DF5C8", "#5CFFD8", "#2A6BFF"), // mint night
-            new Theme("#12071A", "#22102E", "#FF6B9A", "#FFD166", "#FF3D7F"), // sunset
-            new Theme("#03111C", "#0A2236", "#4CC9F0", "#86F7FF", "#7B5CFF"), // deep ocean
-            new Theme("#081207", "#132613", "#B8FF3C", "#E4FF6A", "#16C784"), // toxic lime
-            new Theme("#150803", "#2A140A", "#FF8A3D", "#FFE066", "#FF3B3B"), // ember
-            new Theme("#0C071E", "#1B1238", "#C77DFF", "#F7B2FF", "#5E5BFF"), // ultraviolet
+            new Theme("#4A752C", "#AAD751", "#578A34", "#466E29", "#4674E9", "#355BC2", "#E8F5E1"), // meadow
+            new Theme("#2B4C59", "#9AC2C9", "#3B6575", "#2F5361", "#3E569E", "#2C407D", "#E2F1F4"), // coastal
+            new Theme("#6E563B", "#DFC9A6", "#8A6D4D", "#6E563B", "#2E7D5B", "#205E43", "#F7EFE2"), // sand
+            new Theme("#233B2E", "#6E9C7B", "#325442", "#274334", "#E6A832", "#C4821B", "#E3F2E8"), // pine
+            new Theme("#2D3247", "#8E98B5", "#414866", "#343A54", "#2B8A9E", "#1E6878", "#E8EBF5"), // slate
+            new Theme("#1F2428", "#2E353B", "#444E57", "#505C66", "#5CB85C", "#3E8E41", "#E6EDF3"), // charcoal
         };
     }
 
     public static class Palette
     {
-        public static readonly Color Berry = Hex("#FF4D6D");
-        public static readonly Color Star = Hex("#FFD54A");
-        public static readonly Color Ghost = Hex("#9FF3FF");
-        public static readonly Color Clock = Hex("#6EA8FF");
-        public static readonly Color Shrink = Hex("#C77DFF");
-        public static readonly Color Leaf = Hex("#5BE37D");
-        public static readonly Color Tongue = Hex("#FF3D6E");
-        public static readonly Color Pupil = Hex("#0A0F1F");
-        public static readonly Color SlowBoard = Hex("#1A2D66");
-
-        public static Color For(FoodKind kind) => kind switch
-        {
-            FoodKind.Star => Star,
-            FoodKind.Ghost => Ghost,
-            FoodKind.Clock => Clock,
-            FoodKind.Shrink => Shrink,
-            _ => Berry,
-        };
+        public static readonly Color Berry = Hex("#E53935");
+        public static readonly Color Leaf = Hex("#43A047");
+        public static readonly Color Gold = Hex("#F5C542");
+        public static readonly Color Tongue = Hex("#E53935");
+        public static readonly Color Pupil = Hex("#141920");
+        public static readonly Color Shadow = new Color(0f, 0f, 0f, 0.18f);
 
         public static Color Hex(string hex) => ColorUtility.TryParseHtmlString(hex, out var c) ? c : Color.magenta;
 

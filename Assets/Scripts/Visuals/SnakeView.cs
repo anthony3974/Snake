@@ -1,32 +1,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>
-    /// Draws the snake as a smooth glowing tube. Segments slide between grid cells every frame
+    /// Draws the snake as a smooth solid tube. Segments slide between grid cells every frame
     /// (interpolated), so movement looks fluid even though the rules run on a grid tick.
-    /// The head has eyes that blink and track the nearest food, plus a flicking tongue.
+    /// The head has eyes that blink and track the berry, plus a flicking tongue.
     /// </summary>
     public class SnakeView
     {
         public struct Look
         {
             public Color head, tail;
-            public float angle, time, ghost, rainbow, breathe;
+            public float angle, time, breathe;
             public bool hasLookAt;
             public Vector2 lookAt;
             public int hidden; // segments popped from the head end while dying
         }
 
-        const int HeadOrder = 1100, BodyOrder = 1000, GlowOrder = 5;
+        const int HeadOrder = 1100, BodyOrder = 1000;
         static readonly Vector2 EyeOffset = new Vector2(0.15f, 0.21f);
 
         readonly Transform root, head;
-        readonly SpriteRenderer headSr, headGlow, eyeL, eyeR, pupilL, pupilR, tongue;
+        readonly SpriteRenderer headSr, eyeL, eyeR, pupilL, pupilR, tongue;
         readonly List<SpriteRenderer> segs = new List<SpriteRenderer>();
         readonly List<SpriteRenderer> fills = new List<SpriteRenderer>();
-        readonly List<SpriteRenderer> glows = new List<SpriteRenderer>();
         Vector2[] pos = new Vector2[64];
         float blinkIn = 2f, blinkT = -1f, tongueIn = 2.5f, tongueT = -1f, bonkT = -1f, chompT = -1f;
         bool dead;
@@ -40,7 +39,6 @@ namespace NeonSnake
             head = new GameObject("Head").transform;
             head.SetParent(root, false);
 
-            headGlow = Make("HeadGlow", root, Art.Glow, GlowOrder);
             headSr = Make("HeadBody", head, Art.Circle, HeadOrder);
             tongue = Make("Tongue", head, Art.Pixel, HeadOrder - 1);
             eyeL = Make("EyeL", head, Art.Circle, HeadOrder + 1);
@@ -67,50 +65,38 @@ namespace NeonSnake
             for (int i = 0; i < n; i++)
                 pos[i] = Vector2.LerpUnclamped(prev[i], body[i], t) + half;
 
-            float alpha = Mathf.Lerp(1f, 0.42f + 0.08f * Mathf.Sin(look.time * 20f), look.ghost);
-
             for (int i = 0; i < segs.Count; i++)
             {
                 bool on = i < n && i >= look.hidden;
-                SpriteRenderer seg = segs[i], fill = fills[i], glow = glows[i];
+                SpriteRenderer seg = segs[i], fill = fills[i];
                 bool fillOn = on && i < n - 1;
                 seg.enabled = on && i > 0; // index 0 is drawn by the head
                 fill.enabled = fillOn;
-                glow.enabled = on && (i & 1) == 0;
                 if (!on) continue;
 
                 float w = Width(i, n) * Swell(i, bulges, look);
                 Color c = ColorAt(i, n, look);
-                c.a = alpha;
 
                 if (i > 0)
                 {
                     Put(seg, pos[i], w);
                     seg.color = c;
                 }
-                if (glow.enabled)
-                {
-                    Put(glow, pos[i], w * 2.3f);
-                    glow.color = c.WithAlpha(0.14f * alpha);
-                }
                 if (fillOn)
                 {
                     // Extra circle between neighbours so the body reads as one continuous tube.
                     float w2 = 0.5f * (w + Width(i + 1, n) * Swell(i + 1, bulges, look));
                     Put(fill, (pos[i] + pos[i + 1]) * 0.5f, w2);
-                    Color c2 = Color.Lerp(c, ColorAt(i + 1, n, look), 0.5f);
-                    c2.a = alpha;
-                    fill.color = c2;
+                    fill.color = Color.Lerp(c, ColorAt(i + 1, n, look), 0.5f);
                 }
             }
 
-            RenderHead(n > 0 && look.hidden == 0, look, alpha, bulges, dt);
+            RenderHead(n > 0 && look.hidden == 0, look, bulges, dt);
         }
 
-        void RenderHead(bool on, in Look look, float alpha, List<float> bulges, float dt)
+        void RenderHead(bool on, in Look look, List<float> bulges, float dt)
         {
             if (head.gameObject.activeSelf != on) head.gameObject.SetActive(on);
-            headGlow.enabled = on;
             if (!on) return;
 
             Vector2 p = pos[0];
@@ -145,14 +131,9 @@ namespace NeonSnake
             }
             float s = 0.95f * Swell(0, bulges, look);
             head.localScale = new Vector3(s * sx, s * sy, 1f);
+            headSr.color = ColorAt(0, 1, look);
 
-            Color hc = ColorAt(0, 1, look);
-            hc.a = alpha;
-            headSr.color = hc;
-            Put(headGlow, p, s * 2.6f);
-            headGlow.color = hc.WithAlpha(0.2f * alpha);
-
-            // Eyes: blink now and then, pupils follow the food.
+            // Eyes: blink now and then, pupils follow the berry.
             float open = 1f;
             if (dead) open = 0f;
             else
@@ -179,8 +160,8 @@ namespace NeonSnake
                 if (toFood.sqrMagnitude > 0.01f)
                     lookDir = Quaternion.Euler(0f, 0f, -look.angle) * toFood.normalized;
             }
-            Eye(eyeL, pupilL, new Vector2(EyeOffset.x, EyeOffset.y), open, lookDir, alpha);
-            Eye(eyeR, pupilR, new Vector2(EyeOffset.x, -EyeOffset.y), open, lookDir, alpha);
+            Eye(eyeL, pupilL, new Vector2(EyeOffset.x, EyeOffset.y), open, lookDir);
+            Eye(eyeR, pupilR, new Vector2(EyeOffset.x, -EyeOffset.y), open, lookDir);
 
             // Tongue flick.
             float e = 0f;
@@ -205,20 +186,20 @@ namespace NeonSnake
             {
                 tongue.transform.localPosition = new Vector3(0.4f + 0.17f * e, 0f, 0f);
                 tongue.transform.localScale = new Vector3(0.36f * e, 0.07f, 1f);
-                tongue.color = Palette.Tongue.WithAlpha(alpha);
+                tongue.color = Palette.Tongue;
             }
         }
 
-        void Eye(SpriteRenderer eye, SpriteRenderer pupil, Vector2 at, float open, Vector2 lookDir, float alpha)
+        void Eye(SpriteRenderer eye, SpriteRenderer pupil, Vector2 at, float open, Vector2 lookDir)
         {
             eye.transform.localPosition = at;
             eye.transform.localScale = new Vector3(0.32f, 0.32f * Mathf.Max(0.12f, open), 1f);
-            eye.color = dead ? new Color(0.1f, 0.1f, 0.15f, alpha) : new Color(1f, 1f, 1f, alpha);
+            eye.color = dead ? new Color(0.12f, 0.14f, 0.16f, 1f) : Color.white;
             pupil.enabled = open > 0.45f;
             if (!pupil.enabled) return;
             pupil.transform.localPosition = at + lookDir * 0.065f;
             pupil.transform.localScale = new Vector3(0.16f, 0.16f, 1f);
-            pupil.color = Palette.Pupil.WithAlpha(alpha);
+            pupil.color = Palette.Pupil;
         }
 
         void EnsureCapacity(int n)
@@ -229,7 +210,6 @@ namespace NeonSnake
                 int i = segs.Count;
                 segs.Add(Make("Seg", root, Art.Circle, BodyOrder - 2 * i));
                 fills.Add(Make("Fill", root, Art.Circle, BodyOrder - 2 * i - 1));
-                glows.Add(Make("Glow", root, Art.Glow, GlowOrder));
             }
         }
 
@@ -274,16 +254,6 @@ namespace NeonSnake
         {
             float f = n > 1 ? i / (float)(n - 1) : 0f;
             Color c = Color.Lerp(look.head, look.tail, f);
-            float shimmer = 1f + 0.07f * Mathf.Sin(i * 0.8f - look.time * 6f);
-            c.r *= shimmer;
-            c.g *= shimmer;
-            c.b *= shimmer;
-            if (look.rainbow > 0f)
-            {
-                Color rb = Color.HSVToRGB(Mathf.Repeat(look.time * 0.45f - i * 0.04f, 1f), 0.6f, 1f);
-                c = Color.Lerp(c, rb, 0.7f * look.rainbow);
-            }
-            if (look.ghost > 0f) c = Color.Lerp(c, Palette.Ghost, 0.45f * look.ghost);
             c.a = 1f;
             return c;
         }

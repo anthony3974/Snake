@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>
     /// Spawns the game automatically when the first scene loads, so pressing Play in any scene works

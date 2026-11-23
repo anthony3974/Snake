@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
-    /// <summary>Pooled sprite particles, camera shake and drifting background motes.</summary>
+    /// <summary>Pooled sprite particles and camera shake.</summary>
     public class Fx
     {
         class Particle
@@ -16,47 +16,19 @@ namespace NeonSnake
             public bool grow, alive;
         }
 
-        class Mote
-        {
-            public Transform tr;
-            public SpriteRenderer sr;
-            public Vector2 uv;
-            public float speed, alpha, phase;
-        }
-
-        const int MaxParticles = 400;
-        const int MoteCount = 26;
+        const int MaxParticles = 300;
 
         readonly Transform root;
-        readonly Camera cam;
         readonly List<Particle> particles = new List<Particle>();
-        readonly List<Mote> motes = new List<Mote>();
         int cursor;
         float shake, clock;
 
         public Vector3 ShakeOffset { get; private set; }
 
-        public Fx(Transform parent, Camera cam)
+        public Fx(Transform parent)
         {
-            this.cam = cam;
             root = new GameObject("Fx").transform;
             root.SetParent(parent, false);
-
-            for (int i = 0; i < MoteCount; i++)
-            {
-                var sr = NewRenderer("Mote", Art.Glow, -40);
-                float size = Random.Range(0.25f, 0.7f);
-                sr.transform.localScale = new Vector3(size, size, 1f);
-                motes.Add(new Mote
-                {
-                    tr = sr.transform,
-                    sr = sr,
-                    uv = new Vector2(Random.value, Random.value),
-                    speed = Random.Range(0.15f, 0.5f),
-                    alpha = Random.Range(0.05f, 0.16f),
-                    phase = Random.Range(0f, 10f),
-                });
-            }
         }
 
         SpriteRenderer NewRenderer(string name, Sprite sprite, int order)
@@ -78,7 +50,7 @@ namespace NeonSnake
             }
             if (particles.Count < MaxParticles)
             {
-                var sr = NewRenderer("Particle", Art.Glow, 2000);
+                var sr = NewRenderer("Particle", Art.Circle, 2000);
                 var p = new Particle { tr = sr.transform, sr = sr };
                 particles.Add(p);
                 return p;
@@ -107,19 +79,19 @@ namespace NeonSnake
             p.tr.localScale = Vector3.zero;
         }
 
-        public void Burst(Vector2 at, Color color, int count, float speed, float size = 0.3f, float life = 0.55f, float gravity = 0f)
+        public void Burst(Vector2 at, Color color, int count, float speed, float size = 0.22f, float life = 0.45f, float gravity = 0f)
         {
             for (int i = 0; i < count; i++)
             {
                 Vector2 dir = Random.insideUnitCircle.normalized;
                 if (dir == Vector2.zero) dir = Vector2.up;
-                Emit(at, dir * speed * Random.Range(0.3f, 1f), color, size * Random.Range(0.6f, 1.3f),
-                    life * Random.Range(0.7f, 1.2f), Art.Glow, gravity, 0f, false);
+                Emit(at, dir * speed * Random.Range(0.3f, 1f), color, size * Random.Range(0.6f, 1.25f),
+                    life * Random.Range(0.7f, 1.15f), Art.Circle, gravity, 0f, false);
             }
         }
 
-        /// <summary>Expanding shockwave ring.</summary>
-        public void Ring(Vector2 at, Color color, float size = 0.7f, float life = 0.4f)
+        /// <summary>Expanding feedback ring.</summary>
+        public void Ring(Vector2 at, Color color, float size = 0.65f, float life = 0.35f)
             => Emit(at, Vector2.zero, color, size, life, Art.Ring, 0f, 0f, true);
 
         public void Confetti(Vector2 at, Color[] colors, int count)
@@ -134,7 +106,7 @@ namespace NeonSnake
 
         public void Shake(float amount) => shake = Mathf.Max(shake, amount);
 
-        public void Tick(float dt, Color moteColor)
+        public void Tick(float dt)
         {
             clock += dt;
 
@@ -154,7 +126,7 @@ namespace NeonSnake
                 p.pos += p.vel * dt;
                 p.angle += p.spin * dt;
                 float k = p.life / p.maxLife;
-                float s = p.grow ? p.size * (1f + 1.8f * (1f - k)) : p.size * (0.35f + 0.65f * k);
+                float s = p.grow ? p.size * (1f + 1.5f * (1f - k)) : p.size * (0.35f + 0.65f * k);
                 p.tr.localPosition = p.pos;
                 p.tr.localScale = new Vector3(s, s, 1f);
                 p.tr.localRotation = Quaternion.Euler(0f, 0f, p.angle);
@@ -169,22 +141,6 @@ namespace NeonSnake
                 shake = Mathf.MoveTowards(shake, 0f, dt * (0.6f + shake * 3f));
             }
             else ShakeOffset = Vector3.zero;
-
-            float halfH = cam.orthographicSize, halfW = halfH * cam.aspect;
-            Vector2 center = cam.transform.position;
-            for (int i = 0; i < motes.Count; i++)
-            {
-                var m = motes[i];
-                m.uv.y += m.speed * dt / (2f * halfH);
-                m.uv.x += Mathf.Sin(clock * 0.5f + m.phase) * 0.004f * dt;
-                if (m.uv.y > 1.05f)
-                {
-                    m.uv.y = -0.05f;
-                    m.uv.x = Random.value;
-                }
-                m.tr.localPosition = new Vector3(center.x + (m.uv.x - 0.5f) * 2f * halfW, center.y + (m.uv.y - 0.5f) * 2f * halfH, 0f);
-                m.sr.color = moteColor.WithAlpha(m.alpha * (0.6f + 0.4f * Mathf.Sin(clock * 1.3f + m.phase)));
-            }
         }
     }
 }

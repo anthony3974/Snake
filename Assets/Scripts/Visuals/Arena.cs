@@ -1,9 +1,9 @@
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>
-    /// The board: checkered floor, glowing frame, theme colours and camera framing.
+    /// The board: checkered floor, crisp frame, theme colours and camera framing.
     /// Board cell (x, y) covers world space [x, x+1] x [y, y+1].
     /// </summary>
     public class Arena
@@ -14,7 +14,7 @@ namespace NeonSnake
         public Theme Current => current;
 
         readonly Camera cam;
-        readonly SpriteRenderer board, frame, frameGlow, backGlow;
+        readonly SpriteRenderer board, frame;
         Texture2D checkerTex;
         Sprite checkerSprite;
         Theme from, to, current;
@@ -28,10 +28,7 @@ namespace NeonSnake
             var root = new GameObject("Arena").transform;
             root.SetParent(parent, false);
 
-            backGlow = NewRenderer("BackGlow", root, Art.Glow, -60);
             board = NewRenderer("Board", root, null, -50);
-            frameGlow = NewRenderer("FrameGlow", root, Art.FrameGlow, -48);
-            frameGlow.drawMode = SpriteDrawMode.Sliced;
             frame = NewRenderer("Frame", root, Art.Frame, -47);
             frame.drawMode = SpriteDrawMode.Sliced;
 
@@ -64,11 +61,7 @@ namespace NeonSnake
 
             var center = new Vector3(cols * 0.5f, rows * 0.5f, 0f);
             frame.transform.localPosition = center;
-            frame.size = new Vector2(cols + 0.3f, rows + 0.3f);
-            frameGlow.transform.localPosition = center;
-            frameGlow.size = new Vector2(cols + 1.05f, rows + 1.05f);
-            backGlow.transform.localPosition = center;
-            backGlow.transform.localScale = new Vector3(cols * 2.2f, rows * 1.5f, 1f);
+            frame.size = new Vector2(cols + 0.32f, rows + 0.32f);
         }
 
         /// <summary>Fits the board inside a pixel rect of the screen (safe area minus HUD).</summary>
@@ -90,23 +83,21 @@ namespace NeonSnake
             if (instant) current = to;
         }
 
-        /// <summary>Briefly brightens the frame (level up).</summary>
+        /// <summary>Briefly brightens the frame on level up.</summary>
         public void Pulse(float amount) => pulse = Mathf.Max(pulse, amount);
 
-        public void Tick(float dt, float slowMo)
+        public void Tick(float dt)
         {
             if (themeT < 1f)
             {
-                themeT = Mathf.Min(1f, themeT + dt / 1.2f);
+                themeT = Mathf.Min(1f, themeT + dt / 1.0f);
                 current = Theme.Lerp(from, to, Ease.Smooth(themeT));
             }
             pulse = Mathf.MoveTowards(pulse, 0f, dt * 1.5f);
 
             cam.backgroundColor = current.bg;
-            board.color = Color.Lerp(current.board, Palette.SlowBoard, slowMo * 0.6f);
-            frame.color = Color.Lerp(current.frame, Color.white, pulse * 0.6f);
-            frameGlow.color = current.frame.WithAlpha(0.55f + 0.45f * pulse);
-            backGlow.color = current.frame.WithAlpha(0.1f + 0.12f * pulse);
+            board.color = current.board;
+            frame.color = Color.Lerp(current.frame, Color.white, pulse * 0.25f);
         }
     }
 }

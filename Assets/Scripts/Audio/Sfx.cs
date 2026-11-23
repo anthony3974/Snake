@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>Chiptune-style sound effects synthesised at startup, so there are no audio files.</summary>
     public class Sfx : MonoBehaviour
@@ -11,7 +11,7 @@ namespace NeonSnake
 
         public bool Enabled = true;
 
-        public AudioClip Eat, Star, Power, Level, Die, Bonk, Click, Shrink, Beep, Go, Pop, Expire, Spawn;
+        public AudioClip Eat, Level, Die, Bonk, Click, Beep, Go, Pop;
 
         AudioSource[] voices;
         int next;
@@ -28,18 +28,13 @@ namespace NeonSnake
             }
 
             Eat = Sweep("eat", 0.11f, 520f, 1040f, Wave.Triangle, 20f, 0.6f);
-            Star = Notes("star", new[] { 1046.5f, 1568f, 2093f }, 0.065f, Wave.Triangle, 10f, 0.45f);
-            Power = Notes("power", new[] { 523.3f, 659.3f, 784f, 1046.5f }, 0.065f, Wave.Square, 9f, 0.3f);
             Level = Notes("level", new[] { 392f, 523.3f, 659.3f, 784f, 1046.5f, 1318.5f }, 0.075f, Wave.Triangle, 7f, 0.5f);
             Die = Sweep("die", 0.75f, 420f, 50f, Wave.Square, 3f, 0.55f, 0.3f);
             Bonk = Sweep("bonk", 0.14f, 180f, 90f, Wave.Sine, 25f, 0.9f);
             Click = Sweep("click", 0.04f, 1400f, 1200f, Wave.Sine, 60f, 0.35f);
-            Shrink = Notes("shrink", new[] { 784f, 659.3f, 523.3f }, 0.06f, Wave.Square, 12f, 0.3f);
             Beep = Sweep("beep", 0.1f, 660f, 660f, Wave.Sine, 18f, 0.5f);
             Go = Sweep("go", 0.16f, 990f, 1320f, Wave.Triangle, 12f, 0.5f);
             Pop = Sweep("pop", 0.06f, 300f, 760f, Wave.Sine, 45f, 0.5f);
-            Expire = Notes("expire", new[] { 784f, 523.3f }, 0.07f, Wave.Triangle, 12f, 0.35f);
-            Spawn = Notes("spawn", new[] { 1318.5f, 1760f }, 0.05f, Wave.Sine, 14f, 0.22f);
         }
 
         public void Play(AudioClip clip, float volume = 1f, float pitch = 1f)

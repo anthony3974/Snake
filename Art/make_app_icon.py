@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Draws the Android app icon: a neon snake on the board, heading for a berry.
+"""Draws the Android app icon: a classic snake on a checkered grass board, heading for a berry.
 
-Colours are the "mint night" theme in Assets/Scripts/Visuals/Theme.cs. Writes, into Assets/Icons/:
+Colours match the "meadow" theme in Assets/Scripts/Visuals/Theme.cs. Writes, into Assets/Icons/:
   AppIcon_Background.png  adaptive icon background layer (432 px, 108 dp at 4x)
   AppIcon_Foreground.png  adaptive icon foreground layer (432 px, transparent)
   AppIcon.png             legacy icon: both layers on a rounded square (512 px)
@@ -27,14 +27,13 @@ def hex_rgb(h):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-BG = hex_rgb("#060A16")
-BOARD = hex_rgb("#101932")
-GRID = hex_rgb("#1A2850")
-HEAD = hex_rgb("#5CFFD8")
-TAIL = hex_rgb("#2A6BFF")
-BERRY = hex_rgb("#FF4D6D")
-LEAF = hex_rgb("#5BE37D")
-PUPIL = hex_rgb("#0A0F1F")
+BOARD_LIGHT = hex_rgb("#AAD751")
+BOARD_DARK = hex_rgb("#A0CB4C")
+HEAD = hex_rgb("#4674E9")
+TAIL = hex_rgb("#355BC2")
+BERRY = hex_rgb("#E53935")
+LEAF = hex_rgb("#43A047")
+PUPIL = hex_rgb("#141920")
 
 CELL = 40
 ORIGIN = 96  # a 6x6 grid of 40 px cells, centred in the 432 px layer
@@ -55,15 +54,16 @@ def mix(a, b, t):
 
 def background(size):
     s = size / LAYER
-    img = Image.new("RGBA", (size, size), BG + (255,))
-    glow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse([int(40 * s), int(40 * s), int(392 * s), int(392 * s)], fill=BOARD + (255,))
-    img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(40 * s)))
+    img = Image.new("RGBA", (size, size), BOARD_LIGHT + (255,))
     d = ImageDraw.Draw(img)
-    for k in range(-2, 9):
-        p = (ORIGIN + CELL * k) * s
-        d.line([(p, 0), (p, size)], fill=GRID + (255,), width=max(1, int(2 * s)))
-        d.line([(0, p), (size, p)], fill=GRID + (255,), width=max(1, int(2 * s)))
+    for r in range(-3, 10):
+        for c in range(-3, 10):
+            if (r + c) & 1:
+                x0 = int((ORIGIN + CELL * c) * s)
+                y0 = int((ORIGIN + CELL * r) * s)
+                x1 = int((ORIGIN + CELL * (c + 1)) * s)
+                y1 = int((ORIGIN + CELL * (r + 1)) * s)
+                d.rectangle([x0, y0, x1, y1], fill=BOARD_DARK + (255,))
     return img
 
 
@@ -93,17 +93,21 @@ def foreground(size):
     berry = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     bd = ImageDraw.Draw(berry)
     bd.ellipse([bx - br, by - br + 3 * s, bx + br, by + br + 3 * s], fill=BERRY + (255,))
-    bd.ellipse([bx - br * 0.45, by - br * 0.35, bx - br * 0.05, by + br * 0.05], fill=(255, 160, 180, 255))
+    bd.ellipse([bx - br * 0.45, by - br * 0.35, bx - br * 0.05, by + br * 0.05], fill=(255, 175, 175, 255))
     bd.polygon([(bx, by - br + 4 * s), (bx + 12 * s, by - br - 8 * s), (bx + 2 * s, by - br - 4 * s)], fill=LEAF + (255,))
     bd.line([(bx, by - br + 4 * s), (bx - 2 * s, by - br - 6 * s)], fill=LEAF + (255,), width=int(3 * s))
 
-    # Neon glow behind both.
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    # Subtle matte drop shadow behind both (no neon glow).
     both = snake.copy()
     both.alpha_composite(berry)
-    glow = both.filter(ImageFilter.GaussianBlur(10 * s))
-    img.alpha_composite(glow)
-    img.alpha_composite(glow)
+    alpha = both.split()[3]
+    shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    shadow_layer = Image.new("RGBA", (size, size), (0, 0, 0, 52))
+    shadow.paste(shadow_layer, (0, int(4 * s)), alpha)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(3 * s))
+
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    img.alpha_composite(shadow)
     img.alpha_composite(both)
     return img
 

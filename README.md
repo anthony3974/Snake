@@ -1,24 +1,27 @@
 # Snake
 
-A classic Snake game built with Unity 6 (6000.0.85f1) and the Universal Render Pipeline. It supports touch swipe controls for mobile and ships with generated visuals, sound effects and post-processing.
+A classic Snake game built with Unity 6 (6000.0.85f1) and the Universal Render Pipeline. It supports touch swipe controls for mobile and ships with clean, procedurally generated visuals and sound effects.
 
 ## Features
 
-- Classic Snake gameplay: eat food, grow, avoid walls and yourself
-- Swipe input for Android, plus keyboard input through the Input System
-- Procedurally generated art, themes and visual effects
-- Generated sound effects
-- In-game UI for score and game state
+- Classic Snake gameplay: eat berries, grow, chain speed combos, level up with obstacle blocks, and avoid walls and yourself
+- Swipe input for Android, plus keyboard and mouse controls through the Input System
+- Procedurally generated crisp matte visuals, natural level themes, and particle effects
+- Synthesised chiptune-style sound effects and optional mobile haptics
+- In-game UI for score, best score, combo bar, pause menu, and game over stats
 
 ## Project structure
 
 | Path | Contents |
 | --- | --- |
 | `Assets/Scripts/Core` | Game logic (`SnakeGame`), bootstrap, swipe input |
-| `Assets/Scripts/Visuals` | Arena, snake and food views, themes, effects, post-processing |
+| `Assets/Scripts/Visuals` | Arena, snake, berry and block views, themes, effects |
 | `Assets/Scripts/Audio` | Sound effects (`Sfx`) |
 | `Assets/Scripts/UI` | Game UI (`GameUI`) |
+| `Assets/Editor` | Android app icon setup and APK build script (`SnakeAndroidBuild`) |
+| `Assets/Icons` | Generated Android adaptive, legacy, and round app icons |
 | `Assets/Scenes` | `SampleScene`, the main scene |
+| `Art` | Icon generator script (`make_app_icon.py`) |
 
 ## Getting started
 
@@ -32,7 +35,15 @@ A classic Snake game built with Unity 6 (6000.0.85f1) and the Universal Render P
 
 ## Building for Android
 
-Open **File > Build Profiles**, select **Android**, and click **Build**.
+From the Unity Editor, use **Tools > Snake > Build APK** (or **File > Build Profiles > Android**).
+
+From the command line (with Unity closed):
+
+```bash
+Unity -batchmode -nographics -projectPath . -executeMethod SnakeAndroidBuild.CommandLine -logFile Logs/android-build.log
+```
+
+This applies the icons in `Assets/Icons` and outputs `apks/snake.apk`. To regenerate the icons after editing `Art/make_app_icon.py`, run `python3 Art/make_app_icon.py`.
 
 ## License
 

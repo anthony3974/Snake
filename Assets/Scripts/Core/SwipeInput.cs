@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>
     /// Swipe detection for touch (and mouse drag / keyboard in the editor).

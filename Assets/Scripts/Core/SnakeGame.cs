@@ -1,12 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace NeonSnake
+namespace Snake
 {
-    public enum FoodKind { Berry, Star, Ghost, Clock, Shrink }
-
     /// <summary>
-    /// Owns the rules: grid, snake body, food, power-ups, combos, levels and the game state machine.
+    /// Owns the rules: grid, snake body, food, combos, levels and the game state machine.
     /// Visuals, UI, audio and input are created and driven from here.
     /// </summary>
     public class SnakeGame : MonoBehaviour
@@ -15,9 +13,7 @@ namespace NeonSnake
 
         class Food
         {
-            public FoodKind kind;
             public Vector2Int cell;
-            public float life, maxLife;
             public FoodView view;
         }
 
@@ -31,9 +27,6 @@ namespace NeonSnake
         const int BerriesPerLevel = 5;
         const int ComboSteps = 18;            // steps you have to reach the next food to keep a combo
         const int MaxMultiplier = 5;
-        const float GhostDuration = 7f;
-        const float SlowDuration = 6f;
-        const float SlowFactor = 1.6f;
         const int MaxObstacles = 10;
         const int MaxQueuedTurns = 3;
 
@@ -67,10 +60,10 @@ namespace NeonSnake
         int pendingGrowth;
         bool graceUsed;
         int score, best, level, berries, combo, comboSteps;
-        float ghostTimer, slowTimer, playTime, resumeTimer, popTimer, sparkleTimer;
+        float playTime, resumeTimer, popTimer;
         int popped, lastCountdown;
         bool firstReady = true, soundOn, hapticsOn, won;
-        Food berry, special;
+        Food berry;
         Vector2Int lastScreen;
         Rect lastSafe;
 
@@ -92,14 +85,13 @@ namespace NeonSnake
             }
             cam.orthographic = true;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            PostFx.Setup(cam, transform);
 
             best = PlayerPrefs.GetInt(BestKey, 0);
             soundOn = PlayerPrefs.GetInt(SoundKey, 1) == 1;
             hapticsOn = PlayerPrefs.GetInt(HapticsKey, 1) == 1;
 
             arena = new Arena(transform, cam);
-            fx = new Fx(transform, cam);
+            fx = new Fx(transform);
             view = new SnakeView(transform);
             sfx = gameObject.AddComponent<Sfx>();
             sfx.Enabled = soundOn;
@@ -127,7 +119,6 @@ namespace NeonSnake
             blocks.Clear();
             obstacles.Clear();
             RemoveFood(ref berry);
-            RemoveFood(ref special);
             bulges.Clear();
             turnQueue.Clear();
 
@@ -149,7 +140,7 @@ namespace NeonSnake
             berries = 0;
             combo = 0;
             comboSteps = 0;
-            ghostTimer = slowTimer = playTime = 0f;
+            playTime = 0f;
             pendingGrowth = 0;
             graceUsed = false;
             won = false;
@@ -159,7 +150,7 @@ namespace NeonSnake
             interp = 0f;
 
             // First berry sits straight ahead so the first bite is easy.
-            berry = CreateFood(FoodKind.Berry, new Vector2Int(hx, Mathf.Min(rows - 2, hy + Mathf.Max(4, rows / 3))));
+            berry = CreateFood(new Vector2Int(hx, Mathf.Min(rows - 2, hy + Mathf.Max(4, rows / 3))));
 
             view.Revive();
             ui.ResetHud(best);
@@ -216,71 +207,38 @@ namespace NeonSnake
                 case State.Dying: TickDying(dt); break;
             }
 
-            TickFood(dt);
+            berry?.view.Tick(dt);
             Theme theme = arena.Current;
             for (int i = 0; i < blocks.Count; i++) blocks[i].Tick(dt, theme);
-            arena.Tick(dt, slowTimer > 0f ? Mathf.Clamp01(slowTimer / 0.6f) : 0f);
+            arena.Tick(dt);
             RenderSnake(dt);
-            fx.Tick(dt, arena.Current.frame);
+            fx.Tick(dt);
             cam.transform.position = arena.CameraBase + fx.ShakeOffset;
 
-            ui.SetAccent(arena.Current.head);
+            ui.SetAccent(arena.Current.accent);
             ui.SetBest(Mathf.Max(best, score));
             ui.SetCombo(combo >= 2 ? Mathf.Min(combo, MaxMultiplier) : 0, ComboFraction());
-            ui.SetPowers(ghostTimer / GhostDuration, slowTimer / SlowDuration);
             ui.Tick(dt);
         }
 
         void TickPlaying(float dt)
         {
             playTime += dt;
-            if (ghostTimer > 0f)
-            {
-                ghostTimer -= dt;
-                if (ghostTimer <= 0f)
-                {
-                    ghostTimer = 0f;
-                    sfx.Play(sfx.Expire, 0.6f);
-                }
-            }
-            if (slowTimer > 0f)
-            {
-                slowTimer -= dt;
-                if (slowTimer <= 0f)
-                {
-                    slowTimer = 0f;
-                    sfx.Play(sfx.Expire, 0.6f, 0.8f);
-                }
-            }
 
-            float step = StepInterval();
             stepTimer += dt;
-            while (stepTimer >= step && state == State.Playing)
+            while (stepTimer >= interval && state == State.Playing)
             {
-                stepTimer -= step;
+                stepTimer -= interval;
                 Step();
-                step = StepInterval();
             }
-            if (state == State.Playing) interp = Mathf.Clamp01(stepTimer / step);
+            if (state == State.Playing) interp = Mathf.Clamp01(stepTimer / interval);
 
             // Swallowed food bulges travel towards the tail.
-            float advance = dt / step * 1.6f;
+            float advance = dt / interval * 1.6f;
             for (int i = bulges.Count - 1; i >= 0; i--)
             {
                 bulges[i] += advance;
                 if (bulges[i] > body.Count + 2) bulges.RemoveAt(i);
-            }
-
-            // Rainbow sparkles while on a big combo.
-            if (combo >= 3 && state == State.Playing)
-            {
-                sparkleTimer -= dt;
-                if (sparkleTimer <= 0f)
-                {
-                    sparkleTimer = 0.05f;
-                    Color c = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.7f, 1f), 0.55f, 1f);
-                    fx.Burst(view.HeadPosition, c, 1, 1.5f, 0.22f, 0.5f);
-                }
             }
         }
 
@@ -318,23 +276,6 @@ namespace NeonSnake
             if (popped >= body.Count && popTimer >= 0.55f) ShowGameOver();
         }
 
-        void TickFood(float dt)
-        {
-            berry?.view.Tick(dt, -1f);
-            if (special == null) return;
-            if (state == State.Playing)
-            {
-                special.life -= dt;
-                if (special.life <= 0f)
-                {
-                    fx.Burst(Arena.CellCenter(special.cell), Palette.For(special.kind), 10, 3f, 0.25f, 0.4f);
-                    RemoveFood(ref special);
-                    return;
-                }
-            }
-            special.view.Tick(dt, special.life / special.maxLife);
-        }
-
         void RenderSnake(float dt)
         {
             if (state == State.Ready || state == State.Playing || state == State.Resuming)
@@ -344,21 +285,14 @@ namespace NeonSnake
             }
 
             Theme th = arena.Current;
-            Food focus = special ?? berry;
-            float ghost = 0f;
-            if (ghostTimer > 0f)
-                ghost = ghostTimer > 1.5f ? 1f : (Mathf.Sin(Time.time * 28f) > 0f ? 1f : 0.25f); // flicker = about to end
-
             var look = new SnakeView.Look
             {
                 head = th.head,
                 tail = th.tail,
                 time = Time.time,
                 angle = headAngle,
-                hasLookAt = focus != null,
-                lookAt = focus != null ? Arena.CellCenter(focus.cell) : Vector2.zero,
-                ghost = ghost,
-                rainbow = combo >= 3 ? 1f : 0f,
+                hasLookAt = berry != null,
+                lookAt = berry != null ? Arena.CellCenter(berry.cell) : Vector2.zero,
                 breathe = state == State.Ready ? 1f : 0f,
                 hidden = (state == State.Dying || state == State.GameOver) && !won ? popped : 0,
             };
@@ -369,8 +303,6 @@ namespace NeonSnake
         // Rules
 
         float IntervalFor(int lvl) => Mathf.Max(MinInterval, BaseInterval * Mathf.Pow(SpeedUpPerLevel, lvl - 1));
-
-        float StepInterval() => interval * (slowTimer > 0f ? SlowFactor : 1f);
 
         float ComboFraction()
         {
@@ -425,14 +357,12 @@ namespace NeonSnake
             if (comboSteps > 0 && --comboSteps == 0) combo = 0;
 
             if (berry != null && next == berry.cell) EatBerry();
-            else if (special != null && next == special.cell) EatSpecial();
         }
 
         bool IsLethal(Vector2Int c)
         {
             if (c.x < 0 || c.y < 0 || c.x >= Cols || c.y >= arena.Rows) return true;
             if (obstacles.Contains(c)) return true;
-            if (ghostTimer > 0f) return false;
             // The tail moves out of the way this step unless we are growing.
             int count = pendingGrowth > 0 ? body.Count : body.Count - 1;
             for (int i = 1; i < count; i++)
@@ -468,78 +398,19 @@ namespace NeonSnake
             RemoveFood(ref berry);
             pendingGrowth++;
             int mult = BumpCombo();
-            AddScore((5 + 5 * level) * mult, p, Palette.Berry, mult);
+            AddScore((5 + 5 * level) * mult, p, Color.white, mult);
             bulges.Add(0f);
-            fx.Burst(p, Palette.Berry, 14, 5f, 0.3f, 0.5f);
-            fx.Burst(p, arena.Current.head, 6, 3f, 0.22f, 0.4f);
-            fx.Ring(p, Palette.Berry, 0.6f, 0.35f);
+            fx.Burst(p, Palette.Berry, 10, 4.5f, 0.22f, 0.42f);
+            fx.Burst(p, Palette.Leaf, 4, 3f, 0.16f, 0.35f);
+            fx.Ring(p, Palette.Berry.WithAlpha(0.6f), 0.55f, 0.3f);
             sfx.Play(sfx.Eat, 0.8f, 1f + 0.08f * (mult - 1));
             view.Chomp();
 
             berries++;
             if (berries % BerriesPerLevel == 0) LevelUp();
 
-            berry = SpawnFood(FoodKind.Berry);
-            if (berry == null)
-            {
-                Win();
-                return;
-            }
-            MaybeSpawnSpecial();
-        }
-
-        void EatSpecial()
-        {
-            Vector2 p = Arena.CellCenter(special.cell);
-            FoodKind kind = special.kind;
-            RemoveFood(ref special);
-            Color c = Palette.For(kind);
-            fx.Burst(p, c, 22, 6.5f, 0.32f, 0.6f);
-            fx.Ring(p, c, 0.8f, 0.45f);
-            view.Chomp();
-
-            switch (kind)
-            {
-                case FoodKind.Star:
-                {
-                    int mult = BumpCombo();
-                    AddScore(50 * mult, p, c, mult);
-                    fx.Burst(p, Color.white, 10, 8f, 0.2f, 0.4f);
-                    sfx.Play(sfx.Star, 0.8f);
-                    break;
-                }
-                case FoodKind.Ghost:
-                    ghostTimer = GhostDuration;
-                    AddScore(20, p, c, 1);
-                    ui.Banner("GHOST MODE", c);
-                    sfx.Play(sfx.Power, 0.8f);
-                    break;
-                case FoodKind.Clock:
-                    slowTimer = SlowDuration;
-                    AddScore(20, p, c, 1);
-                    ui.Banner("SLOW-MO", c);
-                    sfx.Play(sfx.Power, 0.8f, 0.75f);
-                    break;
-                case FoodKind.Shrink:
-                    ShrinkTail(4);
-                    AddScore(30, p, c, 1);
-                    ui.Banner("SHRINK!", c);
-                    sfx.Play(sfx.Shrink, 0.8f);
-                    break;
-            }
-        }
-
-        void ShrinkTail(int amount)
-        {
-            int remove = Mathf.Min(amount, body.Count - StartLength);
-            for (int i = 0; i < remove; i++)
-            {
-                fx.Burst(Arena.CellCenter(body[body.Count - 1]), arena.Current.tail, 6, 3f, 0.28f, 0.45f);
-                body.RemoveAt(body.Count - 1);
-                prev.RemoveAt(prev.Count - 1);
-            }
-            for (int i = bulges.Count - 1; i >= 0; i--)
-                if (bulges[i] > body.Count) bulges.RemoveAt(i);
+            berry = SpawnFood();
+            if (berry == null) Win();
         }
 
         void LevelUp()
@@ -549,7 +420,7 @@ namespace NeonSnake
             arena.SetTheme(level - 1, false);
             arena.Pulse(1f);
             ui.SetLevel(level);
-            ui.Banner($"LEVEL {level}", Theme.All[(level - 1) % Theme.All.Length].head);
+            ui.Banner($"LEVEL {level}", Color.white);
             sfx.Play(sfx.Level, 0.7f);
 
             if (level >= 3)
@@ -557,23 +428,6 @@ namespace NeonSnake
                 int add = level >= 6 ? 2 : 1;
                 for (int i = 0; i < add && obstacles.Count < MaxObstacles; i++) AddObstacle();
             }
-        }
-
-        void MaybeSpawnSpecial()
-        {
-            if (special != null) return;
-            float r = Random.value;
-            FoodKind kind;
-            if (r < 0.16f) kind = FoodKind.Star;
-            else if (level >= 2 && r < 0.24f) kind = FoodKind.Ghost;
-            else if (level >= 2 && r < 0.32f) kind = FoodKind.Clock;
-            else if (body.Count >= 10 && r < 0.39f) kind = FoodKind.Shrink;
-            else return;
-
-            special = SpawnFood(kind);
-            if (special == null) return;
-            special.life = special.maxLife = kind == FoodKind.Star ? 6f : 8f;
-            sfx.Play(sfx.Spawn, 0.6f);
         }
 
         void AddObstacle()
@@ -594,7 +448,7 @@ namespace NeonSnake
             Vector2Int cell = scratchCells[Random.Range(0, scratchCells.Count)];
             obstacles.Add(cell);
             blocks.Add(new BlockView(transform, Arena.CellCenter(cell)));
-            fx.Burst(Arena.CellCenter(cell), arena.Current.frame, 12, 4f, 0.3f, 0.5f);
+            fx.Burst(Arena.CellCenter(cell), arena.Current.block, 8, 3.5f, 0.22f, 0.4f);
         }
 
         bool InFront(Vector2Int head, Vector2Int c, int range)
@@ -616,7 +470,7 @@ namespace NeonSnake
 
         static int Manhattan(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
 
-        bool IsFoodCell(Vector2Int c) => (berry != null && berry.cell == c) || (special != null && special.cell == c);
+        bool IsFoodCell(Vector2Int c) => berry != null && berry.cell == c;
 
         void FillBodySet()
         {
@@ -646,19 +500,16 @@ namespace NeonSnake
             return true;
         }
 
-        Food SpawnFood(FoodKind kind)
+        Food SpawnFood()
         {
             if (!TryFindFreeCell(3, out Vector2Int cell) && !TryFindFreeCell(0, out cell)) return null;
-            return CreateFood(kind, cell);
+            return CreateFood(cell);
         }
 
-        Food CreateFood(FoodKind kind, Vector2Int cell) => new Food
+        Food CreateFood(Vector2Int cell) => new Food
         {
-            kind = kind,
             cell = cell,
-            life = -1f,
-            maxLife = -1f,
-            view = new FoodView(kind, transform, Arena.CellCenter(cell)),
+            view = new FoodView(transform, Arena.CellCenter(cell)),
         };
 
         static void RemoveFood(ref Food food)
@@ -700,11 +551,11 @@ namespace NeonSnake
             turnQueue.Clear();
 
             Vector2 impact = Vector2.Lerp(Arena.CellCenter(body[0]), Arena.CellCenter(into), 0.5f);
-            fx.Shake(0.45f);
-            fx.Burst(impact, Color.white, 20, 8f, 0.3f, 0.5f);
-            fx.Burst(impact, arena.Current.head, 16, 5f, 0.35f, 0.6f);
-            fx.Ring(impact, Color.white, 0.8f, 0.45f);
-            ui.Flash(new Color(1f, 0.35f, 0.45f), 0.4f);
+            fx.Shake(0.4f);
+            fx.Burst(impact, Color.white, 12, 6f, 0.22f, 0.4f);
+            fx.Burst(impact, arena.Current.head, 12, 4.5f, 0.24f, 0.5f);
+            fx.Ring(impact, Color.white.WithAlpha(0.7f), 0.7f, 0.35f);
+            ui.Flash(new Color(0.9f, 0.25f, 0.25f), 0.25f);
             sfx.Play(sfx.Die, 0.9f);
             view.SetDead();
             if (hapticsOn) Haptics.Vibrate();
@@ -714,7 +565,7 @@ namespace NeonSnake
         {
             Vector2 p = Arena.CellCenter(body[i]);
             float f = body.Count > 1 ? i / (body.Count - 1f) : 0f;
-            fx.Burst(p, Color.Lerp(arena.Current.head, arena.Current.tail, f), 5, 3.5f, 0.3f, 0.5f);
+            fx.Burst(p, Color.Lerp(arena.Current.head, arena.Current.tail, f), 4, 3f, 0.22f, 0.4f);
             if ((i & 1) == 0) sfx.Play(sfx.Pop, 0.3f, Mathf.Min(2.2f, 0.8f + i * 0.025f));
         }
 
@@ -725,8 +576,8 @@ namespace NeonSnake
             SetState(State.Dying);
             popped = body.Count;
             popTimer = 0f;
-            ui.Banner("PERFECT!", Palette.Star);
-            fx.Confetti(new Vector2(Cols * 0.5f, arena.Rows * 0.5f), new[] { Palette.Star, Palette.Berry, arena.Current.head }, 80);
+            ui.Banner("PERFECT!", Palette.Gold);
+            fx.Confetti(new Vector2(Cols * 0.5f, arena.Rows * 0.5f), new[] { Palette.Gold, Palette.Berry, arena.Current.head }, 80);
             sfx.Play(sfx.Level);
         }
 
@@ -744,7 +595,7 @@ namespace NeonSnake
             ui.ShowGameOver(won, score, best, newBest, body.Count, level, playTime);
             if (newBest)
             {
-                var colors = new[] { Palette.Star, Palette.Berry, Palette.Ghost, arena.Current.head };
+                var colors = new[] { Palette.Gold, Palette.Berry, arena.Current.head, arena.Current.tail };
                 fx.Confetti(new Vector2(Cols * 0.5f, arena.Rows * 0.55f), colors, 70);
                 sfx.Play(sfx.Level, 0.7f);
             }

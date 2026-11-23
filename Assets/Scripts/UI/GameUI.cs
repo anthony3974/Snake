@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
-namespace NeonSnake
+namespace Snake
 {
     /// <summary>
     /// Builds the whole uGUI layer in code: HUD, ready screen, pause menu, game over,
@@ -13,10 +13,10 @@ namespace NeonSnake
     /// </summary>
     public class GameUI : MonoBehaviour
     {
-        public const float TopBarHeight = 190f;
+        public const float TopBarHeight = 164f;
         const float RefWidth = 1080f, RefHeight = 1920f;
         static readonly Vector2 Center = new Vector2(0.5f, 0.5f);
-        static readonly Color Ink = new Color(0.04f, 0.05f, 0.1f, 1f);
+        static readonly Color Ink = new Color(0.08f, 0.11f, 0.10f, 1f);
 
         public event Action PauseClicked, ResumeClicked, RestartClicked, SoundClicked, HapticsClicked;
 
@@ -35,31 +35,22 @@ namespace NeonSnake
             public float age = 99f, scale = 1f;
         }
 
-        class Pill
-        {
-            public GameObject go;
-            public RectTransform fill;
-        }
-
         Font font;
         Camera cam;
         CanvasScaler scaler;
         RectTransform canvasRect, safeRect, popupLayer;
         readonly List<Graphic> accentGraphics = new List<Graphic>();
-        readonly List<Outline> accentOutlines = new List<Outline>();
         readonly List<PopupItem> popups = new List<PopupItem>();
         Color accent = new Color(-1f, 0f, 0f, 0f);
 
         Text scoreText, bestText, levelText, comboText;
         GameObject comboBar;
         RectTransform comboFill;
-        Pill ghostPill, slowPill;
         int targetScore, shownBest = -1, shownCombo = -1, shownLevel = -1;
         float shownScore, scorePunch;
 
         Overlay ready, pause, over;
         Text titleText, readyBestText, hintText;
-        GameObject legend;
         Text soundText, hapticsText;
         Text overTitle, overScore, overBest, overStats, newBestText;
         RectTransform againButton;
@@ -103,14 +94,14 @@ namespace NeonSnake
             popupLayer = NewRect("Popups", canvasRect);
             Stretch(popupLayer);
 
-            bannerText = Label(canvasRect, "", 96, TextAnchor.MiddleCenter, Color.white);
+            bannerText = Label(canvasRect, "", 88, TextAnchor.MiddleCenter, Color.white);
             Place(bannerText.rectTransform, new Vector2(0.5f, 0.62f), Center, Vector2.zero, new Vector2(1000f, 140f));
             AddShadow(bannerText);
             bannerText.enabled = false;
 
-            countdownText = Label(canvasRect, "", 240, TextAnchor.MiddleCenter, Color.white, true);
+            countdownText = Label(canvasRect, "", 220, TextAnchor.MiddleCenter, Color.white);
             Place(countdownText.rectTransform, Center, Center, Vector2.zero, new Vector2(600f, 300f));
-            AddGlow(countdownText, 0.35f);
+            AddShadow(countdownText);
             countdownText.enabled = false;
 
             BuildReady();
@@ -151,19 +142,19 @@ namespace NeonSnake
             var left = new Vector2(0f, 0.5f);
             var right = new Vector2(1f, 0.5f);
 
-            var scoreLabel = Label(bar, "SCORE", 30, TextAnchor.MiddleLeft, Faded(0.55f));
-            Place(scoreLabel.rectTransform, tl, left, new Vector2(44f, -42f), new Vector2(300f, 40f));
-            scoreText = Label(bar, "0", 88, TextAnchor.MiddleLeft, Color.white);
-            Place(scoreText.rectTransform, tl, left, new Vector2(40f, -104f), new Vector2(460f, 100f));
+            var scoreLabel = Label(bar, "SCORE", 28, TextAnchor.MiddleLeft, Faded(0.7f));
+            Place(scoreLabel.rectTransform, tl, left, new Vector2(44f, -38f), new Vector2(300f, 40f));
+            scoreText = Label(bar, "0", 84, TextAnchor.MiddleLeft, Color.white);
+            Place(scoreText.rectTransform, tl, left, new Vector2(40f, -98f), new Vector2(460f, 100f));
 
-            levelText = Label(bar, "LEVEL 1", 34, TextAnchor.MiddleCenter, Color.white, true);
-            Place(levelText.rectTransform, tc, Center, new Vector2(0f, -42f), new Vector2(320f, 44f));
-            comboText = Label(bar, "", 48, TextAnchor.MiddleCenter, Color.white, true);
-            Place(comboText.rectTransform, tc, Center, new Vector2(0f, -98f), new Vector2(360f, 60f));
+            levelText = Label(bar, "LEVEL 1", 32, TextAnchor.MiddleCenter, Color.white, true);
+            Place(levelText.rectTransform, tc, Center, new Vector2(0f, -38f), new Vector2(320f, 44f));
+            comboText = Label(bar, "", 44, TextAnchor.MiddleCenter, Color.white, true);
+            Place(comboText.rectTransform, tc, Center, new Vector2(0f, -92f), new Vector2(360f, 56f));
 
             var cb = NewRect("ComboBar", bar);
-            Place(cb, tc, Center, new Vector2(0f, -138f), new Vector2(240f, 10f));
-            var cbBack = Img(cb, Art.Pixel, Faded(0.15f));
+            Place(cb, tc, Center, new Vector2(0f, -130f), new Vector2(220f, 10f));
+            var cbBack = Img(cb, Art.Pixel, Faded(0.2f));
             Stretch(cbBack.rectTransform);
             var cbFill = Img(cb, Art.Pixel, Color.white, true);
             Stretch(cbFill.rectTransform);
@@ -171,90 +162,50 @@ namespace NeonSnake
             comboBar = cb.gameObject;
             comboBar.SetActive(false);
 
-            var bestLabel = Label(bar, "BEST", 30, TextAnchor.MiddleRight, Faded(0.55f));
-            Place(bestLabel.rectTransform, tr, right, new Vector2(-180f, -42f), new Vector2(300f, 40f));
+            var bestLabel = Label(bar, "BEST", 28, TextAnchor.MiddleRight, Faded(0.7f));
+            Place(bestLabel.rectTransform, tr, right, new Vector2(-176f, -38f), new Vector2(300f, 40f));
             bestText = Label(bar, "0", 52, TextAnchor.MiddleRight, Color.white);
-            Place(bestText.rectTransform, tr, right, new Vector2(-180f, -100f), new Vector2(320f, 70f));
+            Place(bestText.rectTransform, tr, right, new Vector2(-176f, -96f), new Vector2(320f, 70f));
 
-            var pauseBg = Img(bar, Art.UIPanel, Faded(0.1f));
+            var pauseBg = Img(bar, Art.UIPanel, Faded(0.16f));
             pauseBg.raycastTarget = true;
-            Place(pauseBg.rectTransform, tr, right, new Vector2(-36f, -86f), new Vector2(112f, 112f));
+            Place(pauseBg.rectTransform, tr, right, new Vector2(-36f, -82f), new Vector2(106f, 106f));
             var pauseButton = pauseBg.gameObject.AddComponent<Button>();
             pauseButton.targetGraphic = pauseBg;
             pauseButton.onClick.AddListener(() => PauseClicked?.Invoke());
             var barL = Img(pauseBg.transform, Art.Pixel, Color.white);
-            Place(barL.rectTransform, Center, Center, new Vector2(-13f, 0f), new Vector2(14f, 44f));
+            Place(barL.rectTransform, Center, Center, new Vector2(-12f, 0f), new Vector2(13f, 42f));
             var barR = Img(pauseBg.transform, Art.Pixel, Color.white);
-            Place(barR.rectTransform, Center, Center, new Vector2(13f, 0f), new Vector2(14f, 44f));
-
-            ghostPill = MakePill(bar, Art.Diamond, Palette.Ghost, new Vector2(-140f, -172f));
-            slowPill = MakePill(bar, Art.Ring, Palette.Clock, new Vector2(140f, -172f));
-        }
-
-        Pill MakePill(RectTransform parent, Sprite icon, Color color, Vector2 pos)
-        {
-            var r = NewRect("Pill", parent);
-            Place(r, new Vector2(0.5f, 1f), Center, pos, new Vector2(230f, 36f));
-            var left = new Vector2(0f, 0.5f);
-            var i = Img(r, icon, color);
-            Place(i.rectTransform, left, left, Vector2.zero, new Vector2(34f, 34f));
-            var back = Img(r, Art.Pixel, Faded(0.15f));
-            Place(back.rectTransform, left, left, new Vector2(48f, 0f), new Vector2(180f, 10f));
-            var fill = Img(back.transform, Art.Pixel, color);
-            Stretch(fill.rectTransform);
-            r.gameObject.SetActive(false);
-            return new Pill { go = r.gameObject, fill = fill.rectTransform };
+            Place(barR.rectTransform, Center, Center, new Vector2(12f, 0f), new Vector2(13f, 42f));
         }
 
         void BuildReady()
         {
-            ready = NewOverlay("Ready", 0.5f, false);
+            ready = NewOverlay("Ready", 0.56f, false);
             var root = ready.go.transform;
 
-            titleText = Label(root, "NEON\nSNAKE", 170, TextAnchor.MiddleCenter, Color.white, true);
-            titleText.lineSpacing = 0.85f;
-            AddGlow(titleText, 0.35f);
-            Place(titleText.rectTransform, new Vector2(0.5f, 0.77f), Center, Vector2.zero, new Vector2(1000f, 420f));
+            titleText = Label(root, "SNAKE", 160, TextAnchor.MiddleCenter, Color.white);
+            AddShadow(titleText);
+            Place(titleText.rectTransform, new Vector2(0.5f, 0.62f), Center, Vector2.zero, new Vector2(1000f, 220f));
 
-            readyBestText = Label(root, "", 40, TextAnchor.MiddleCenter, Faded(0.7f));
-            Place(readyBestText.rectTransform, new Vector2(0.5f, 0.63f), Center, Vector2.zero, new Vector2(800f, 60f));
+            readyBestText = Label(root, "", 42, TextAnchor.MiddleCenter, Faded(0.8f));
+            Place(readyBestText.rectTransform, new Vector2(0.5f, 0.52f), Center, Vector2.zero, new Vector2(800f, 60f));
 
-            var lg = NewRect("Legend", root);
-            Place(lg, new Vector2(0.5f, 0.41f), Center, Vector2.zero, new Vector2(820f, 520f));
-            legend = lg.gameObject;
-            LegendRow(lg, 200f, Art.Circle, Palette.Berry, "Berry", "grow and score");
-            LegendRow(lg, 115f, Art.Star, Palette.Star, "Star", "big bonus, grab it fast");
-            LegendRow(lg, 30f, Art.Diamond, Palette.Ghost, "Ghost", "slip through your own tail");
-            LegendRow(lg, -55f, Art.Ring, Palette.Clock, "Clock", "slow motion");
-            LegendRow(lg, -140f, Art.Triangle, Palette.Shrink, "Shrink", "lose some tail");
-            var tip = Label(lg, "Eat quickly to chain combos up to x5", 34, TextAnchor.MiddleCenter, Faded(0.65f));
-            Place(tip.rectTransform, Center, Center, new Vector2(0f, -235f), new Vector2(820f, 50f));
-
-            hintText = Label(root, "SWIPE TO SLITHER", 56, TextAnchor.MiddleCenter, Color.white);
-            Place(hintText.rectTransform, new Vector2(0.5f, 0.13f), Center, Vector2.zero, new Vector2(900f, 80f));
-        }
-
-        void LegendRow(RectTransform parent, float y, Sprite icon, Color color, string name, string desc)
-        {
-            var img = Img(parent, icon, color);
-            Place(img.rectTransform, Center, Center, new Vector2(-330f, y), new Vector2(60f, 60f));
-            var t = Label(parent, $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{name}</color>   {desc}", 36,
-                TextAnchor.MiddleLeft, Faded(0.9f));
-            t.supportRichText = true;
-            Place(t.rectTransform, Center, new Vector2(0f, 0.5f), new Vector2(-270f, y), new Vector2(660f, 60f));
+            hintText = Label(root, "SWIPE TO PLAY", 50, TextAnchor.MiddleCenter, Color.white);
+            Place(hintText.rectTransform, new Vector2(0.5f, 0.18f), Center, Vector2.zero, new Vector2(900f, 80f));
         }
 
         void BuildPause()
         {
-            pause = NewOverlay("Pause", 0.8f, true);
+            pause = NewOverlay("Pause", 0.78f, true);
             var root = pause.go.transform;
 
-            var title = Label(root, "PAUSED", 120, TextAnchor.MiddleCenter, Color.white, true);
-            AddGlow(title, 0.3f);
+            var title = Label(root, "PAUSED", 112, TextAnchor.MiddleCenter, Color.white);
+            AddShadow(title);
             Place(title.rectTransform, new Vector2(0.5f, 0.72f), Center, Vector2.zero, new Vector2(900f, 160f));
 
             var anchor = new Vector2(0.5f, 0.45f);
-            var size = new Vector2(620f, 130f);
+            var size = new Vector2(620f, 128f);
             MakeButton(root, "RESUME", anchor, new Vector2(0f, 160f), size, true, () => ResumeClicked?.Invoke());
             soundText = MakeButton(root, "SOUND: ON", anchor, Vector2.zero, size, false, () => SoundClicked?.Invoke());
             hapticsText = MakeButton(root, "VIBRATION: ON", anchor, new Vector2(0f, -160f), size, false, () => HapticsClicked?.Invoke());
@@ -266,28 +217,29 @@ namespace NeonSnake
             over = NewOverlay("GameOver", 0.72f, false);
             var root = over.go.transform;
 
-            overTitle = Label(root, "GAME OVER", 112, TextAnchor.MiddleCenter, Palette.Berry);
+            overTitle = Label(root, "GAME OVER", 104, TextAnchor.MiddleCenter, Color.white);
             Place(overTitle.rectTransform, new Vector2(0.5f, 0.79f), Center, Vector2.zero, new Vector2(1000f, 150f));
             AddShadow(overTitle);
 
-            var scoreLabel = Label(root, "SCORE", 36, TextAnchor.MiddleCenter, Faded(0.6f));
+            var scoreLabel = Label(root, "SCORE", 34, TextAnchor.MiddleCenter, Faded(0.68f));
             Place(scoreLabel.rectTransform, new Vector2(0.5f, 0.7f), Center, Vector2.zero, new Vector2(600f, 50f));
-            overScore = Label(root, "0", 200, TextAnchor.MiddleCenter, Color.white, true);
-            AddGlow(overScore, 0.3f);
+            overScore = Label(root, "0", 190, TextAnchor.MiddleCenter, Color.white);
+            AddShadow(overScore);
             Place(overScore.rectTransform, new Vector2(0.5f, 0.62f), Center, Vector2.zero, new Vector2(1000f, 240f));
 
-            newBestText = Label(root, "NEW BEST!", 62, TextAnchor.MiddleCenter, Palette.Star);
+            newBestText = Label(root, "NEW BEST!", 58, TextAnchor.MiddleCenter, Palette.Gold);
+            AddShadow(newBestText);
             Place(newBestText.rectTransform, new Vector2(0.5f, 0.535f), Center, Vector2.zero, new Vector2(800f, 80f));
 
-            overBest = Label(root, "", 42, TextAnchor.MiddleCenter, Faded(0.75f));
+            overBest = Label(root, "", 42, TextAnchor.MiddleCenter, Faded(0.8f));
             Place(overBest.rectTransform, new Vector2(0.5f, 0.48f), Center, Vector2.zero, new Vector2(800f, 60f));
-            overStats = Label(root, "", 36, TextAnchor.MiddleCenter, Faded(0.6f));
+            overStats = Label(root, "", 36, TextAnchor.MiddleCenter, Faded(0.65f));
             Place(overStats.rectTransform, new Vector2(0.5f, 0.435f), Center, Vector2.zero, new Vector2(1000f, 50f));
 
             // Visual only: a tap anywhere restarts (handled by SwipeInput).
-            var again = MakeButton(root, "PLAY AGAIN", new Vector2(0.5f, 0.29f), Vector2.zero, new Vector2(640f, 150f), true, null);
+            var again = MakeButton(root, "PLAY AGAIN", new Vector2(0.5f, 0.29f), Vector2.zero, new Vector2(640f, 144f), true, null);
             againButton = (RectTransform)again.transform.parent;
-            var tap = Label(root, "tap anywhere", 32, TextAnchor.MiddleCenter, Faded(0.45f));
+            var tap = Label(root, "tap anywhere", 32, TextAnchor.MiddleCenter, Faded(0.55f));
             Place(tap.rectTransform, new Vector2(0.5f, 0.215f), Center, Vector2.zero, new Vector2(600f, 50f));
         }
 
@@ -302,7 +254,6 @@ namespace NeonSnake
             SetLevel(1);
             SetBest(best);
             SetCombo(0, 0f);
-            SetPowers(0f, 0f);
         }
 
         public void SetScore(int score)
@@ -337,12 +288,6 @@ namespace NeonSnake
             if (multiplier >= 2) SetFill(comboFill, fraction);
         }
 
-        public void SetPowers(float ghostFraction, float slowFraction)
-        {
-            UpdatePill(ghostPill, ghostFraction);
-            UpdatePill(slowPill, slowFraction);
-        }
-
         public void SetToggles(bool sound, bool haptics)
         {
             soundText.text = sound ? "SOUND: ON" : "SOUND: OFF";
@@ -354,14 +299,12 @@ namespace NeonSnake
             if (c == accent) return;
             accent = c;
             foreach (var g in accentGraphics) g.color = c.WithAlpha(g.color.a);
-            foreach (var o in accentOutlines) o.effectColor = c.WithAlpha(o.effectColor.a);
         }
 
         public void ShowReady(bool firstTime, int best)
         {
-            titleText.text = firstTime ? "NEON\nSNAKE" : "READY?";
-            titleText.fontSize = firstTime ? 170 : 130;
-            legend.SetActive(firstTime);
+            titleText.text = firstTime ? "SNAKE" : "READY?";
+            titleText.fontSize = firstTime ? 160 : 128;
             readyBestText.text = best > 0 ? $"BEST  {best}" : "";
             Show(ready, true);
         }
@@ -374,7 +317,7 @@ namespace NeonSnake
         public void ShowGameOver(bool won, int score, int best, bool newBest, int length, int level, float seconds)
         {
             overTitle.text = won ? "BOARD CLEARED!" : "GAME OVER";
-            overTitle.color = won ? Palette.Star : Palette.Berry;
+            overTitle.color = won ? Palette.Gold : Color.white;
             overScore.text = score.ToString();
             newBestText.gameObject.SetActive(newBest);
             overBest.text = $"BEST  {best}";
@@ -413,7 +356,7 @@ namespace NeonSnake
                 if (q.age >= 0.9f) { p = q; break; }
             if (p == null)
             {
-                var t = Label(popupLayer, "", 46, TextAnchor.MiddleCenter, Color.white);
+                var t = Label(popupLayer, "", 44, TextAnchor.MiddleCenter, Color.white);
                 Place(t.rectTransform, Center, Center, Vector2.zero, new Vector2(400f, 70f));
                 AddShadow(t);
                 p = new PopupItem { rect = t.rectTransform, text = t };
@@ -441,7 +384,7 @@ namespace NeonSnake
                 scoreText.text = Mathf.RoundToInt(shownScore).ToString();
             }
             scorePunch = Mathf.MoveTowards(scorePunch, 0f, dt * 4f);
-            scoreText.rectTransform.localScale = Vector3.one * (1f + 0.22f * scorePunch * scorePunch);
+            scoreText.rectTransform.localScale = Vector3.one * (1f + 0.18f * scorePunch * scorePunch);
 
             TickOverlay(ready, dt);
             TickOverlay(pause, dt);
@@ -449,20 +392,20 @@ namespace NeonSnake
 
             if (ready.go.activeSelf)
             {
-                float p = 0.5f + 0.5f * Mathf.Sin(clock * 4f);
-                hintText.color = Faded(0.45f + 0.55f * p);
+                float p = 0.5f + 0.5f * Mathf.Sin(clock * 3.5f);
+                hintText.color = Faded(0.55f + 0.45f * p);
             }
             if (over.go.activeSelf)
             {
-                newBestText.rectTransform.localScale = Vector3.one * (1f + 0.08f * Mathf.Sin(clock * 7f));
-                againButton.localScale = Vector3.one * (1f + 0.03f * Mathf.Sin(clock * 4f));
+                newBestText.rectTransform.localScale = Vector3.one * (1f + 0.05f * Mathf.Sin(clock * 6f));
+                againButton.localScale = Vector3.one * (1f + 0.02f * Mathf.Sin(clock * 3.5f));
             }
 
             if (bannerText.enabled)
             {
                 bannerAge += dt;
-                float s = bannerAge < 0.22f ? Mathf.Lerp(1.7f, 1f, Ease.OutCubic(bannerAge / 0.22f)) : 1f;
-                float a = bannerAge < 1.1f ? 1f : 1f - (bannerAge - 1.1f) / 0.4f;
+                float s = bannerAge < 0.22f ? Mathf.Lerp(1.5f, 1f, Ease.OutCubic(bannerAge / 0.22f)) : 1f;
+                float a = bannerAge < 1.0f ? 1f : 1f - (bannerAge - 1.0f) / 0.35f;
                 if (a <= 0f) bannerText.enabled = false;
                 bannerText.rectTransform.localScale = Vector3.one * s;
                 bannerText.color = bannerText.color.WithAlpha(Mathf.Clamp01(a));
@@ -471,7 +414,7 @@ namespace NeonSnake
             if (countdownText.enabled)
             {
                 countdownAge += dt;
-                float s = countdownAge < 0.2f ? Mathf.Lerp(1.6f, 1f, Ease.OutCubic(countdownAge / 0.2f)) : 1f;
+                float s = countdownAge < 0.2f ? Mathf.Lerp(1.5f, 1f, Ease.OutCubic(countdownAge / 0.2f)) : 1f;
                 countdownText.rectTransform.localScale = Vector3.one * s;
                 countdownText.color = countdownText.color.WithAlpha(1f - Mathf.Clamp01((countdownAge - 0.3f) / 0.2f));
             }
@@ -493,10 +436,10 @@ namespace NeonSnake
                     continue;
                 }
                 float u = p.age / 0.9f;
-                p.rect.anchoredPosition = p.start + new Vector2(0f, 150f * Ease.OutCubic(u));
+                p.rect.anchoredPosition = p.start + new Vector2(0f, 140f * Ease.OutCubic(u));
                 float pop = p.age < 0.12f
-                    ? Mathf.Lerp(0.4f, 1.25f, p.age / 0.12f)
-                    : Mathf.Lerp(1.25f, 1f, Mathf.Clamp01((p.age - 0.12f) / 0.15f));
+                    ? Mathf.Lerp(0.5f, 1.2f, p.age / 0.12f)
+                    : Mathf.Lerp(1.2f, 1f, Mathf.Clamp01((p.age - 0.12f) / 0.15f));
                 p.rect.localScale = Vector3.one * (pop * p.scale);
                 p.text.color = p.text.color.WithAlpha(u < 0.55f ? 1f : 1f - (u - 0.55f) / 0.45f);
             }
@@ -511,19 +454,12 @@ namespace NeonSnake
             fill.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
         }
 
-        static void UpdatePill(Pill pill, float fraction)
-        {
-            bool on = fraction > 0f;
-            if (pill.go.activeSelf != on) pill.go.SetActive(on);
-            if (on) SetFill(pill.fill, fraction);
-        }
-
         Overlay NewOverlay(string name, float dim, bool blocksInput)
         {
             var r = NewRect(name, canvasRect);
             Stretch(r);
             var o = new Overlay { go = r.gameObject, group = r.gameObject.AddComponent<CanvasGroup>() };
-            var bg = Img(r, null, new Color(0.01f, 0.02f, 0.05f, dim));
+            var bg = Img(r, null, new Color(0.06f, 0.08f, 0.09f, dim));
             Stretch(bg.rectTransform);
             bg.raycastTarget = blocksInput;
             o.group.alpha = 0f;
@@ -604,7 +540,7 @@ namespace NeonSnake
 
         Text MakeButton(Transform parent, string label, Vector2 anchor, Vector2 pos, Vector2 size, bool primary, Action onClick)
         {
-            var img = Img(parent, Art.UIPanel, primary ? Color.white : Faded(0.12f), primary);
+            var img = Img(parent, Art.UIPanel, primary ? Color.white : Faded(0.16f), primary);
             Place(img.rectTransform, anchor, Center, pos, size);
             if (onClick != null)
             {
@@ -613,24 +549,16 @@ namespace NeonSnake
                 b.targetGraphic = img;
                 b.onClick.AddListener(() => onClick());
             }
-            var t = Label(img.transform, label, 48, TextAnchor.MiddleCenter, primary ? Ink : Color.white);
+            var t = Label(img.transform, label, 46, TextAnchor.MiddleCenter, primary ? Ink : Color.white);
             Stretch(t.rectTransform);
             return t;
-        }
-
-        void AddGlow(Text t, float alpha)
-        {
-            var o = t.gameObject.AddComponent<Outline>();
-            o.effectDistance = new Vector2(3f, -3f);
-            o.effectColor = Faded(alpha);
-            accentOutlines.Add(o);
         }
 
         static void AddShadow(Text t)
         {
             var s = t.gameObject.AddComponent<Shadow>();
-            s.effectDistance = new Vector2(3f, -3f);
-            s.effectColor = new Color(0f, 0f, 0f, 0.6f);
+            s.effectDistance = new Vector2(0f, -3f);
+            s.effectColor = new Color(0f, 0f, 0f, 0.38f);
         }
     }
 }
