@@ -13,20 +13,27 @@ namespace Snake
         public struct Look
         {
             public Color head, tail;
-            public float angle, time, breathe;
+            public float angle, time, breathe, press;
             public bool hasLookAt;
             public Vector2 lookAt;
             public int hidden; // segments popped from the head end while dying
         }
 
-        const int HeadOrder = 1100, BodyOrder = 1000;
+        const int HeadOrder = 1100, BodyOrder = 1000, BodyMeshOrder = 200;
         static readonly Vector2 EyeOffset = new Vector2(0.15f, 0.21f);
 
         readonly Transform root, head;
         readonly SpriteRenderer headSr, eyeL, eyeR, pupilL, pupilR, tongue;
+        readonly Mesh bodyMesh;
+        readonly MeshRenderer bodyMr;
         readonly List<SpriteRenderer> segs = new List<SpriteRenderer>();
-        readonly List<SpriteRenderer> fills = new List<SpriteRenderer>();
+        readonly List<Vector3> verts = new List<Vector3>();
+        readonly List<Vector2> uvs = new List<Vector2>();
+        readonly List<Color> vertColors = new List<Color>();
+        readonly List<int> tris = new List<int>();
         Vector2[] pos = new Vector2[64];
+        float[] widths = new float[64];
+        Color[] segColors = new Color[64];
         float blinkIn = 2f, blinkT = -1f, tongueIn = 2.5f, tongueT = -1f, chompT = -1f;
         bool dead;
 
@@ -38,6 +45,16 @@ namespace Snake
             root.SetParent(parent, false);
             head = new GameObject("Head").transform;
             head.SetParent(root, false);
+
+            var bodyGo = new GameObject("BodyMesh");
+            bodyGo.transform.SetParent(root, false);
+            bodyMesh = new Mesh { name = "SnakeBody" };
+            bodyMesh.MarkDynamic();
+            bodyGo.AddComponent<MeshFilter>().sharedMesh = bodyMesh;
+            bodyMr = bodyGo.AddComponent<MeshRenderer>();
+            var mat = new Material(Shader.Find("Sprites/Default")) { mainTexture = Art.TubeTex };
+            bodyMr.sharedMaterial = mat;
+            bodyMr.sortingOrder = BodyMeshOrder;
 
             headSr = Make("HeadBody", head, Art.Circle, HeadOrder);
             tongue = Make("Tongue", head, Art.Pixel, HeadOrder - 1);
@@ -62,35 +79,98 @@ namespace Snake
             EnsureCapacity(n);
             var half = new Vector2(0.5f, 0.5f);
             for (int i = 0; i < n; i++)
+            {
                 pos[i] = Vector2.LerpUnclamped(prev[i], body[i], t) + half;
+                widths[i] = Width(i, n) * Swell(i, bulges, look);
+                segColors[i] = ColorAt(i, n, look);
+            }
 
             for (int i = 0; i < segs.Count; i++)
             {
-                bool on = i < n && i >= look.hidden;
-                SpriteRenderer seg = segs[i], fill = fills[i];
-                bool fillOn = on && i < n - 1;
-                seg.enabled = on && i > 0; // index 0 is drawn by the head
-                fill.enabled = fillOn;
+                bool on = i < n && i >= look.hidden && i > 0; // index 0 is drawn by the head
+                SpriteRenderer seg = segs[i];
+                seg.enabled = on;
                 if (!on) continue;
 
-                float w = Width(i, n) * Swell(i, bulges, look);
-                Color c = ColorAt(i, n, look);
-
-                if (i > 0)
-                {
-                    Put(seg, pos[i], w);
-                    seg.color = c;
-                }
-                if (fillOn)
-                {
-                    // Extra circle between neighbours so the body reads as one continuous tube.
-                    float w2 = 0.5f * (w + Width(i + 1, n) * Swell(i + 1, bulges, look));
-                    Put(fill, (pos[i] + pos[i + 1]) * 0.5f, w2);
-                    fill.color = Color.Lerp(c, ColorAt(i + 1, n, look), 0.5f);
-                }
+                Put(seg, pos[i], widths[i]);
+                seg.color = segColors[i];
             }
 
+            BuildBodyMesh(n, look.hidden);
             RenderHead(n > 0 && look.hidden == 0, look, bulges, dt);
+        }
+
+        void BuildBodyMesh(int n, int hidden)
+        {
+            verts.Clear();
+            uvs.Clear();
+            vertColors.Clear();
+            tris.Clear();
+
+            bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+            int first = Mathf.Max(0, hidden);
+            for (int i = first; i < n - 1; i++)
+            {
+                Vector2 p0 = pos[i], p1 = pos[i + 1];
+                float w0 = widths[i], w1 = widths[i + 1];
+                float r0 = w0 * Art.CircleRadius, r1 = w1 * Art.CircleRadius;
+                Vector2 delta = p1 - p0;
+                float d = delta.magnitude;
+                if (d <= Mathf.Abs(r0 - r1) + 1e-4f) continue;
+
+                Vector2 dir = delta / d;
+                Vector2 perp = new Vector2(-dir.y, dir.x);
+                float cosA = (r0 - r1) / d;
+                float sinA = Mathf.Sqrt(Mathf.Max(0f, 1f - cosA * cosA));
+
+                // Exact outer-tangent chord midpoints and feathered quad half-widths so the
+                // visible alpha=0.5 contour sits strictly tangent to both joint circles.
+                Vector2 m0 = p0 + dir * (r0 * cosA);
+                Vector2 m1 = p1 + dir * (r1 * cosA);
+                float h0 = 0.5f * w0 * sinA;
+                float h1 = 0.5f * w1 * sinA;
+
+                Vector2 v0R = m0 - perp * h0;
+                Vector2 v0L = m0 + perp * h0;
+                Vector2 v1L = m1 + perp * h1;
+                Vector2 v1R = m1 - perp * h1;
+
+                Color c0 = linear ? segColors[i].linear : segColors[i];
+                Color c1 = linear ? segColors[i + 1].linear : segColors[i + 1];
+
+                int b = verts.Count;
+                verts.Add(v0R);
+                verts.Add(v0L);
+                verts.Add(v1L);
+                verts.Add(v1R);
+                uvs.Add(new Vector2(0f, 0f));
+                uvs.Add(new Vector2(0f, 1f));
+                uvs.Add(new Vector2(1f, 1f));
+                uvs.Add(new Vector2(1f, 0f));
+                vertColors.Add(c0);
+                vertColors.Add(c0);
+                vertColors.Add(c1);
+                vertColors.Add(c1);
+                tris.Add(b);
+                tris.Add(b + 1);
+                tris.Add(b + 2);
+                tris.Add(b);
+                tris.Add(b + 2);
+                tris.Add(b + 3);
+            }
+
+            bodyMesh.Clear();
+            if (verts.Count == 0)
+            {
+                bodyMr.enabled = false;
+                return;
+            }
+            bodyMr.enabled = true;
+            bodyMesh.SetVertices(verts);
+            bodyMesh.SetUVs(0, uvs);
+            bodyMesh.SetColors(vertColors);
+            bodyMesh.SetTriangles(tris, 0);
+            bodyMesh.RecalculateBounds();
         }
 
         void RenderHead(bool on, in Look look, List<float> bulges, float dt)
@@ -100,10 +180,13 @@ namespace Snake
 
             Vector2 p = pos[0];
             HeadPosition = p;
-            head.localPosition = p;
+            float press = look.press > 0f ? Ease.OutCubic(Mathf.Clamp01(look.press)) : 0f;
+            float rad = look.angle * Mathf.Deg2Rad;
+            Vector2 nudge = press > 0f ? new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * (0.045f * press) : Vector2.zero;
+            head.localPosition = p + nudge;
             head.localRotation = Quaternion.Euler(0f, 0f, look.angle);
 
-            float sx = 1f, sy = 1f;
+            float sx = 1f - 0.10f * press, sy = 1f + 0.08f * press;
             if (chompT >= 0f)
             {
                 chompT += dt;
@@ -191,12 +274,17 @@ namespace Snake
 
         void EnsureCapacity(int n)
         {
-            if (pos.Length < n) pos = new Vector2[Mathf.NextPowerOfTwo(n)];
+            if (pos.Length < n)
+            {
+                int cap = Mathf.NextPowerOfTwo(n);
+                pos = new Vector2[cap];
+                widths = new float[cap];
+                segColors = new Color[cap];
+            }
             while (segs.Count < n)
             {
                 int i = segs.Count;
-                segs.Add(Make("Seg", root, Art.Circle, BodyOrder - 2 * i));
-                fills.Add(Make("Fill", root, Art.Circle, BodyOrder - 2 * i - 1));
+                segs.Add(Make("Seg", root, Art.Circle, BodyOrder - i));
             }
         }
 

@@ -9,10 +9,27 @@ namespace Snake
     /// </summary>
     public static class Art
     {
+        /// <summary>Visible circle radius in world units at scale 1 (matches the 61px radius in the 128px texture).</summary>
+        public const float CircleRadius = 61f / 128f;
+
         static Sprite circle, ring, frame, pixel, uiPanel;
+        static Texture2D tubeTex;
 
         /// <summary>Filled circle, about 1 world unit across.</summary>
         public static Sprite Circle => Get(ref circle, () => Shape(128, 128f, (x, y) => Fill(Len(x, y) - 61f)));
+
+        /// <summary>
+        /// 1D vertically feathered alpha strip matching Circle's anti-aliased edge, used for smooth
+        /// tangent-matched body segments between joints.
+        /// </summary>
+        public static Texture2D TubeTex
+        {
+            get
+            {
+                if (tubeTex == null) tubeTex = MakeTubeTex();
+                return tubeTex;
+            }
+        }
 
         public static Sprite Ring => Get(ref ring, () => Shape(128, 128f, (x, y) => Fill(Mathf.Abs(Len(x, y) - 54f) - 5f)));
 
@@ -45,6 +62,28 @@ namespace Snake
                     byte v = ((x + y) & 1) == 0 ? (byte)255 : (byte)240;
                     px[y * cols + x] = new Color32(v, v, v, 255);
                 }
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            return tex;
+        }
+
+        static Texture2D MakeTubeTex()
+        {
+            const int w = 4, h = 128;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                name = "TubeTex",
+            };
+            var px = new Color32[w * h];
+            float half = h * 0.5f;
+            for (int y = 0; y < h; y++)
+            {
+                float a = Mathf.Clamp01(Fill(Mathf.Abs(y + 0.5f - half) - 61f));
+                var c = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f));
+                for (int x = 0; x < w; x++) px[y * w + x] = c;
+            }
             tex.SetPixels32(px);
             tex.Apply(false, true);
             return tex;

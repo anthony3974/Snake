@@ -28,6 +28,8 @@ namespace Snake
         const int ComboSteps = 18;            // steps you have to reach the next food to keep a combo
         const int MaxMultiplier = 5;
         const int MaxQueuedTurns = 3;
+        const float WallGraceTime = 0.28f;    // extra reaction window when facing a wall before dying
+        const float BodyGraceTime = 0.16f;    // brief reaction window before colliding with yourself
 
         const string BestKey = "neon_snake_best";
         const string SoundKey = "neon_snake_sound";
@@ -53,7 +55,8 @@ namespace Snake
         readonly HashSet<Vector2Int> scratchSet = new HashSet<Vector2Int>();
 
         Vector2Int dir = Vector2Int.up;
-        float stepTimer, interval, interp, headAngle = 90f;
+        float stepTimer, interval, interp, headAngle = 90f, graceTimer;
+        bool inGrace;
         int pendingGrowth;
         int score, best, level, berries, combo, comboSteps;
         float playTime, resumeTimer, popTimer;
@@ -140,6 +143,8 @@ namespace Snake
             interval = IntervalFor(level);
             stepTimer = 0f;
             interp = 0f;
+            inGrace = false;
+            graceTimer = 0f;
 
             // First berry sits straight ahead so the first bite is easy.
             berry = CreateFood(new Vector2Int(hx, Mathf.Min(rows - 2, hy + Mathf.Max(4, rows / 3))));
@@ -215,20 +220,49 @@ namespace Snake
         {
             playTime += dt;
 
-            stepTimer += dt;
-            while (stepTimer >= interval && state == State.Playing)
+            if (inGrace)
             {
-                stepTimer -= interval;
-                Step();
+                if (TryConsumeGraceTurn())
+                {
+                    inGrace = false;
+                    graceTimer = 0f;
+                    stepTimer = 0f;
+                    AdvanceBody(body[0] + dir);
+                    if (state == State.Playing) interp = 0f;
+                }
+                else
+                {
+                    Vector2Int blocked = body[0] + dir;
+                    graceTimer += dt;
+                    interp = 1f;
+                    if (graceTimer >= GraceFor(blocked))
+                    {
+                        Die(blocked);
+                        return;
+                    }
+                }
             }
-            if (state == State.Playing) interp = Mathf.Clamp01(stepTimer / interval);
+            else
+            {
+                stepTimer += dt;
+                while (stepTimer >= interval && state == State.Playing)
+                {
+                    float overshoot = stepTimer - interval;
+                    stepTimer = overshoot;
+                    if (!Step(overshoot)) break;
+                }
+                if (state == State.Playing && !inGrace) interp = Mathf.Clamp01(stepTimer / interval);
+            }
 
             // Swallowed food bulges travel towards the tail.
-            float advance = dt / interval * 1.6f;
-            for (int i = bulges.Count - 1; i >= 0; i--)
+            if (!inGrace)
             {
-                bulges[i] += advance;
-                if (bulges[i] > body.Count + 2) bulges.RemoveAt(i);
+                float advance = dt / interval * 1.6f;
+                for (int i = bulges.Count - 1; i >= 0; i--)
+                {
+                    bulges[i] += advance;
+                    if (bulges[i] > body.Count + 2) bulges.RemoveAt(i);
+                }
             }
         }
 
@@ -274,6 +308,10 @@ namespace Snake
                 headAngle = Mathf.MoveTowardsAngle(headAngle, target, 1000f * dt);
             }
 
+            float press = 0f;
+            if (state == State.Playing && inGrace)
+                press = Mathf.Clamp01(graceTimer / GraceFor(body[0] + dir));
+
             Theme th = arena.Current;
             var look = new SnakeView.Look
             {
@@ -284,6 +322,7 @@ namespace Snake
                 hasLookAt = berry != null,
                 lookAt = berry != null ? Arena.CellCenter(berry.cell) : Vector2.zero,
                 breathe = state == State.Ready ? 1f : 0f,
+                press = press,
                 hidden = (state == State.Dying || state == State.GameOver) && !won ? popped : 0,
             };
             view.Render(body, prev, interp, look, bulges, dt);
@@ -301,7 +340,8 @@ namespace Snake
             return Mathf.Clamp01((comboSteps - used) / ComboSteps);
         }
 
-        void Step()
+        /// <summary>Returns false if the step entered crash grace or ended the game.</summary>
+        bool Step(float overshoot)
         {
             while (turnQueue.Count > 0)
             {
@@ -317,10 +357,41 @@ namespace Snake
             Vector2Int next = body[0] + dir;
             if (IsLethal(next))
             {
-                Die(next);
-                return;
+                inGrace = true;
+                graceTimer = overshoot;
+                stepTimer = 0f;
+                interp = 1f;
+                if (graceTimer >= GraceFor(next))
+                {
+                    Die(next);
+                    return false;
+                }
+                return false;
             }
 
+            AdvanceBody(next);
+            return state == State.Playing;
+        }
+
+        bool TryConsumeGraceTurn()
+        {
+            Vector2Int neckDir = body[1] - body[0];
+            while (turnQueue.Count > 0)
+            {
+                Vector2Int d = turnQueue[0];
+                turnQueue.RemoveAt(0);
+                if (d == neckDir) continue;
+                if (!IsLethal(body[0] + d))
+                {
+                    dir = d;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void AdvanceBody(Vector2Int next)
+        {
             prev.Clear();
             prev.AddRange(body);
             body.Insert(0, next);
@@ -336,9 +407,13 @@ namespace Snake
             if (berry != null && next == berry.cell) EatBerry();
         }
 
+        bool IsWall(Vector2Int c) => c.x < 0 || c.y < 0 || c.x >= Cols || c.y >= arena.Rows;
+
+        float GraceFor(Vector2Int c) => IsWall(c) ? WallGraceTime : BodyGraceTime;
+
         bool IsLethal(Vector2Int c)
         {
-            if (c.x < 0 || c.y < 0 || c.x >= Cols || c.y >= arena.Rows) return true;
+            if (IsWall(c)) return true;
             // The tail moves out of the way this step unless we are growing.
             int count = pendingGrowth > 0 ? body.Count : body.Count - 1;
             for (int i = 1; i < count; i++)
@@ -348,6 +423,12 @@ namespace Snake
 
         void QueueTurn(Vector2Int d)
         {
+            if (inGrace && turnQueue.Count == 0)
+            {
+                if (d == body[1] - body[0]) return;
+                turnQueue.Add(d);
+                return;
+            }
             Vector2Int last = turnQueue.Count > 0 ? turnQueue[turnQueue.Count - 1] : dir;
             if (d == last || d + last == Vector2Int.zero || turnQueue.Count >= MaxQueuedTurns) return;
             turnQueue.Add(d);
@@ -471,11 +552,15 @@ namespace Snake
             SetState(State.Playing);
             sfx.Play(sfx.Go, 0.6f);
             stepTimer = 0f;
-            Step(); // start moving immediately rather than after one interval
+            inGrace = false;
+            graceTimer = 0f;
+            Step(0f); // start moving immediately rather than after one interval
         }
 
         void Die(Vector2Int into)
         {
+            inGrace = false;
+            graceTimer = 0f;
             interp = 1f;
             SetState(State.Dying);
             popped = 0;
@@ -548,6 +633,7 @@ namespace Snake
             if (state != State.Paused) return;
             ui.HidePause();
             turnQueue.Clear();
+            graceTimer = 0f;
             resumeTimer = 1.5f;
             lastCountdown = -1;
             SetState(State.Resuming);
