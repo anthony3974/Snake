@@ -27,7 +27,6 @@ namespace Snake
         const int BerriesPerLevel = 5;
         const int ComboSteps = 18;            // steps you have to reach the next food to keep a combo
         const int MaxMultiplier = 5;
-        const int MaxObstacles = 10;
         const int MaxQueuedTurns = 3;
 
         const string BestKey = "neon_snake_best";
@@ -49,8 +48,6 @@ namespace Snake
         readonly List<Vector2Int> body = new List<Vector2Int>();  // [0] is the head
         readonly List<Vector2Int> prev = new List<Vector2Int>();  // body before the last step, for interpolation
         readonly List<Vector2Int> turnQueue = new List<Vector2Int>();
-        readonly HashSet<Vector2Int> obstacles = new HashSet<Vector2Int>();
-        readonly List<BlockView> blocks = new List<BlockView>();
         readonly List<float> bulges = new List<float>();
         readonly List<Vector2Int> scratchCells = new List<Vector2Int>();
         readonly HashSet<Vector2Int> scratchSet = new HashSet<Vector2Int>();
@@ -58,7 +55,6 @@ namespace Snake
         Vector2Int dir = Vector2Int.up;
         float stepTimer, interval, interp, headAngle = 90f;
         int pendingGrowth;
-        bool graceUsed;
         int score, best, level, berries, combo, comboSteps;
         float playTime, resumeTimer, popTimer;
         int popped, lastCountdown;
@@ -115,9 +111,6 @@ namespace Snake
 
         void ResetRound()
         {
-            foreach (var b in blocks) b.Destroy();
-            blocks.Clear();
-            obstacles.Clear();
             RemoveFood(ref berry);
             bulges.Clear();
             turnQueue.Clear();
@@ -142,7 +135,6 @@ namespace Snake
             comboSteps = 0;
             playTime = 0f;
             pendingGrowth = 0;
-            graceUsed = false;
             won = false;
             popped = 0;
             interval = IntervalFor(level);
@@ -208,8 +200,6 @@ namespace Snake
             }
 
             berry?.view.Tick(dt);
-            Theme theme = arena.Current;
-            for (int i = 0; i < blocks.Count; i++) blocks[i].Tick(dt, theme);
             arena.Tick(dt);
             RenderSnake(dt);
             fx.Tick(dt);
@@ -327,23 +317,10 @@ namespace Snake
             Vector2Int next = body[0] + dir;
             if (IsLethal(next))
             {
-                // Mobile-friendly grace: the first time you would crash, the snake stalls for one
-                // step ("bonk") so a slightly late swipe still saves you.
-                if (!graceUsed)
-                {
-                    graceUsed = true;
-                    prev.Clear();
-                    prev.AddRange(body);
-                    view.Bonk();
-                    sfx.Play(sfx.Bonk, 0.7f);
-                    fx.Shake(0.12f);
-                    return;
-                }
                 Die(next);
                 return;
             }
 
-            graceUsed = false;
             prev.Clear();
             prev.AddRange(body);
             body.Insert(0, next);
@@ -362,7 +339,6 @@ namespace Snake
         bool IsLethal(Vector2Int c)
         {
             if (c.x < 0 || c.y < 0 || c.x >= Cols || c.y >= arena.Rows) return true;
-            if (obstacles.Contains(c)) return true;
             // The tail moves out of the way this step unless we are growing.
             int count = pendingGrowth > 0 ? body.Count : body.Count - 1;
             for (int i = 1; i < count; i++)
@@ -422,50 +398,6 @@ namespace Snake
             ui.SetLevel(level);
             ui.Banner($"LEVEL {level}", Color.white);
             sfx.Play(sfx.Level, 0.7f);
-
-            if (level >= 3)
-            {
-                int add = level >= 6 ? 2 : 1;
-                for (int i = 0; i < add && obstacles.Count < MaxObstacles; i++) AddObstacle();
-            }
-        }
-
-        void AddObstacle()
-        {
-            FillBodySet();
-            scratchCells.Clear();
-            Vector2Int h = body[0];
-            for (int x = 1; x < Cols - 1; x++)
-                for (int y = 1; y < arena.Rows - 1; y++)
-                {
-                    var c = new Vector2Int(x, y);
-                    if (scratchSet.Contains(c) || obstacles.Contains(c) || IsFoodCell(c)) continue;
-                    if (Manhattan(c, h) < 5 || InFront(h, c, 8) || NextToObstacle(c)) continue;
-                    scratchCells.Add(c);
-                }
-            if (scratchCells.Count == 0) return;
-
-            Vector2Int cell = scratchCells[Random.Range(0, scratchCells.Count)];
-            obstacles.Add(cell);
-            blocks.Add(new BlockView(transform, Arena.CellCenter(cell)));
-            fx.Burst(Arena.CellCenter(cell), arena.Current.block, 8, 3.5f, 0.22f, 0.4f);
-        }
-
-        bool InFront(Vector2Int head, Vector2Int c, int range)
-        {
-            Vector2Int r = c - head;
-            int along = r.x * dir.x + r.y * dir.y;
-            int side = Mathf.Abs(r.x * dir.y - r.y * dir.x);
-            return along > 0 && along <= range && side <= 1;
-        }
-
-        bool NextToObstacle(Vector2Int c)
-        {
-            for (int dx = -1; dx <= 1; dx++)
-                for (int dy = -1; dy <= 1; dy++)
-                    if ((dx != 0 || dy != 0) && obstacles.Contains(new Vector2Int(c.x + dx, c.y + dy)))
-                        return true;
-            return false;
         }
 
         static int Manhattan(Vector2Int a, Vector2Int b) => Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
@@ -487,7 +419,7 @@ namespace Snake
                 for (int y = 0; y < arena.Rows; y++)
                 {
                     var c = new Vector2Int(x, y);
-                    if (scratchSet.Contains(c) || obstacles.Contains(c) || IsFoodCell(c)) continue;
+                    if (scratchSet.Contains(c) || IsFoodCell(c)) continue;
                     if (Manhattan(c, h) < minHeadDistance) continue;
                     scratchCells.Add(c);
                 }

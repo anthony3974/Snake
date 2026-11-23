@@ -27,7 +27,7 @@ namespace Snake
         readonly List<SpriteRenderer> segs = new List<SpriteRenderer>();
         readonly List<SpriteRenderer> fills = new List<SpriteRenderer>();
         Vector2[] pos = new Vector2[64];
-        float blinkIn = 2f, blinkT = -1f, tongueIn = 2.5f, tongueT = -1f, bonkT = -1f, chompT = -1f;
+        float blinkIn = 2f, blinkT = -1f, tongueIn = 2.5f, tongueT = -1f, chompT = -1f;
         bool dead;
 
         public Vector2 HeadPosition { get; private set; }
@@ -47,14 +47,13 @@ namespace Snake
             pupilR = Make("PupilR", head, Art.Circle, HeadOrder + 2);
         }
 
-        public void Bonk() => bonkT = 0f;
         public void Chomp() => chompT = 0f;
         public void SetDead() => dead = true;
 
         public void Revive()
         {
             dead = false;
-            bonkT = chompT = tongueT = blinkT = -1f;
+            chompT = tongueT = blinkT = -1f;
         }
 
         public void Render(List<Vector2Int> body, List<Vector2Int> prev, float t, in Look look, List<float> bulges, float dt)
@@ -105,18 +104,6 @@ namespace Snake
             head.localRotation = Quaternion.Euler(0f, 0f, look.angle);
 
             float sx = 1f, sy = 1f;
-            if (bonkT >= 0f)
-            {
-                bonkT += dt;
-                float u = bonkT / 0.22f;
-                if (u >= 1f) bonkT = -1f;
-                else
-                {
-                    float k = Mathf.Sin(u * Mathf.PI);
-                    sx -= 0.22f * k;
-                    sy += 0.16f * k;
-                }
-            }
             if (chompT >= 0f)
             {
                 chompT += dt;

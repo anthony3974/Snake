@@ -9,15 +9,12 @@ namespace Snake
     /// </summary>
     public static class Art
     {
-        static Sprite circle, ring, block, frame, pixel, uiPanel;
+        static Sprite circle, ring, frame, pixel, uiPanel;
 
         /// <summary>Filled circle, about 1 world unit across.</summary>
         public static Sprite Circle => Get(ref circle, () => Shape(128, 128f, (x, y) => Fill(Len(x, y) - 61f)));
 
         public static Sprite Ring => Get(ref ring, () => Shape(128, 128f, (x, y) => Fill(Mathf.Abs(Len(x, y) - 54f) - 5f)));
-
-        /// <summary>Rounded square used for obstacles.</summary>
-        public static Sprite Block => Get(ref block, () => Shape(64, 64f, (x, y) => Fill(RoundBox(x, y, 31f, 31f, 13f))));
 
         /// <summary>Clean rounded outline, 9-sliced so it can wrap the board at any size.</summary>
         public static Sprite Frame => Get(ref frame, () => Shape(64, 64f,

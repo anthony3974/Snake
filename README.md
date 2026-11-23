@@ -4,7 +4,7 @@ A classic Snake game built with Unity 6 (6000.0.85f1) and the Universal Render P
 
 ## Features
 
-- Classic Snake gameplay: eat berries, grow, chain speed combos, level up with obstacle blocks, and avoid walls and yourself
+- Classic Snake gameplay: eat berries, grow, chain speed combos, level up, and avoid walls and yourself
 - Swipe input for Android, plus keyboard and mouse controls through the Input System
 - Procedurally generated crisp matte visuals, natural level themes, and particle effects
 - Synthesised chiptune-style sound effects and optional mobile haptics
@@ -15,7 +15,7 @@ A classic Snake game built with Unity 6 (6000.0.85f1) and the Universal Render P
 | Path | Contents |
 | --- | --- |
 | `Assets/Scripts/Core` | Game logic (`SnakeGame`), bootstrap, swipe input |
-| `Assets/Scripts/Visuals` | Arena, snake, berry and block views, themes, effects |
+| `Assets/Scripts/Visuals` | Arena, snake and berry views, themes, effects |
 | `Assets/Scripts/Audio` | Sound effects (`Sfx`) |
 | `Assets/Scripts/UI` | Game UI (`GameUI`) |
 | `Assets/Editor` | Android app icon setup and APK build script (`SnakeAndroidBuild`) |

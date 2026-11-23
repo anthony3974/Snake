@@ -11,7 +11,7 @@ namespace Snake
 
         public bool Enabled = true;
 
-        public AudioClip Eat, Level, Die, Bonk, Click, Beep, Go, Pop;
+        public AudioClip Eat, Level, Die, Click, Beep, Go, Pop;
 
         AudioSource[] voices;
         int next;
@@ -30,7 +30,6 @@ namespace Snake
             Eat = Sweep("eat", 0.11f, 520f, 1040f, Wave.Triangle, 20f, 0.6f);
             Level = Notes("level", new[] { 392f, 523.3f, 659.3f, 784f, 1046.5f, 1318.5f }, 0.075f, Wave.Triangle, 7f, 0.5f);
             Die = Sweep("die", 0.75f, 420f, 50f, Wave.Square, 3f, 0.55f, 0.3f);
-            Bonk = Sweep("bonk", 0.14f, 180f, 90f, Wave.Sine, 25f, 0.9f);
             Click = Sweep("click", 0.04f, 1400f, 1200f, Wave.Sine, 60f, 0.35f);
             Beep = Sweep("beep", 0.1f, 660f, 660f, Wave.Sine, 18f, 0.5f);
             Go = Sweep("go", 0.16f, 990f, 1320f, Wave.Triangle, 12f, 0.5f);
